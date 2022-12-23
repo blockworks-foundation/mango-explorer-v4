@@ -1,0 +1,380 @@
+{
+  "groups": [
+    {
+      "publicKey": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+      "cluster": "MAINNET",
+      "name": "MAINNET.0",
+      "mangoProgramId": "4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg",
+      "insuranceVault": "F1vqFqkZHh5jd5rf8BcEzT8kqfd1snB1adRkayJ9KPNY",
+      "insuranceMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "insuranceMintDecimals": 6,
+      "perpMarkets": [
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "HwhVGkfsSQ9JSQeQYu2CbkRCLvsh3qRZxG6m4oMVwZpN",
+          "marketIndex": 0,
+          "name": "BTC-PERP",
+          "baseDecimals": 6,
+          "baseLotSize": 100,
+          "quoteLotSize": 10,
+          "oracle": "GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU",
+          "active": true,
+          "settleTokenIndex": 0
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "9Y8paZ5wUpzLFfQuHz8j2RtPrKsDtHx9sbgFmWb5abCw",
+          "marketIndex": 1,
+          "name": "MNGO-PERP",
+          "baseDecimals": 6,
+          "baseLotSize": 1000000,
+          "quoteLotSize": 100,
+          "oracle": "79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4",
+          "active": false,
+          "settleTokenIndex": 0
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "ESdnpnNLgTkBCZRuTJkZLi5wKEZ2z47SG3PJrhundSQ2",
+          "marketIndex": 2,
+          "name": "SOL-PERP",
+          "baseDecimals": 9,
+          "baseLotSize": 10000000,
+          "quoteLotSize": 100,
+          "oracle": "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG",
+          "active": true,
+          "settleTokenIndex": 0
+        }
+      ],
+      "tokens": [
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "tokenIndex": 0,
+          "symbol": "USDC",
+          "decimals": 6,
+          "oracle": "7e7xcRkdb4uJ4A6xShYwBJrWJk5V4AmrEFqAPhSMvzSx",
+          "mintInfo": "9jPkVdufMKbg62ndJHv5CqCAkzssmstyDi9kxsvrjbSc",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "J6MsZiJUU6bjKSCkbfQsiHkd8gvJoddG2hsdSFsZQEZV"
+            }
+          ],
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "mint": "MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac",
+          "tokenIndex": 6,
+          "symbol": "MNGO",
+          "decimals": 6,
+          "oracle": "79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4",
+          "mintInfo": "2rbDQ2E1kDK4SHPbr1VUzB6sKdxkcJxDq8jYf44R4oVi",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "5covW85GcCq3kHCJtcKCKYyQoxZLnHiz3zw5TEZEYgKj"
+            }
+          ],
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "mint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+          "tokenIndex": 5,
+          "symbol": "MSOL",
+          "decimals": 9,
+          "oracle": "E4v1BBgoso9s64TQvmyownAVJbhbEPGyzA3qn4n46qj9",
+          "mintInfo": "HopzURnbkLPpQch37o5sN31knjpYGrENuwy9UASXkhfC",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "AL2BeApHWeHdzERdiCy13ZrmPXaiBWG8s11deHrZPuSt"
+            }
+          ],
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+          "tokenIndex": 3,
+          "symbol": "ETH",
+          "decimals": 8,
+          "oracle": "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB",
+          "mintInfo": "J8Mq6JQUqaKfWjn9fjaYq8S5haCJXuUGtavjtQHzW4Vm",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "5h2KcPQQijX1RR35yhBJPDzvrsLd4sUcTtXUq3PhVhY9"
+            }
+          ],
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+          "tokenIndex": 1,
+          "symbol": "USDT",
+          "decimals": 6,
+          "oracle": "3vxLXJqLqF3JG5TCbYycbKWRBbCJQLxQmBGCkyqEEefL",
+          "mintInfo": "HPmQ7dvQpZV7yoRo8NqMS9jVZBJXocE472b1bbGoLG1Q",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "3k87hyqCaFR2G4SVwsLNMyPmR1mFN6uo7dUytzKQYu9d"
+            }
+          ],
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "mint": "EjmyN6qEC1Tf1JxiG1ae7UTJhUxSwk1TCWNWqxWV4J6o",
+          "tokenIndex": 2,
+          "symbol": "DAI",
+          "decimals": 8,
+          "oracle": "CtJ8EkqLmeYyGB8s4jevpeNsvmD4dxVR2krfsDLcvV8Y",
+          "mintInfo": "A2EmRoXjscbwzbWS84rTnsvWwF2S9T7cdUNwshLWJcbf",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "2AyZpjYWZf42ui1wzWJ642KWMCCY5YEU9GnKRWzQHLYW"
+            }
+          ],
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "mint": "So11111111111111111111111111111111111111112",
+          "tokenIndex": 4,
+          "symbol": "SOL",
+          "decimals": 9,
+          "oracle": "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG",
+          "mintInfo": "EzQYaAhP3mdL4C8VQAAYxec9idCe31yCyAmzxWHLR4QJ",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "FqEhSJSP3ao8RwRSekaAQ9sNQBSANhfb6EPtxQBByyh5"
+            }
+          ],
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "mint": "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh",
+          "tokenIndex": 8,
+          "symbol": "wBTC (Portal)",
+          "decimals": 8,
+          "oracle": "GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU",
+          "mintInfo": "59rgC1pa45EziDPyFgJgE7gbv7Dd7VaGmd2D93i1dtFk",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "8gabXzwdPn5TvtuQvysh3CxVbjfNY3TZd5XEG5qnueUm"
+            }
+          ],
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+          "tokenIndex": 7,
+          "symbol": "BONK",
+          "decimals": 5,
+          "oracle": "4SZ1qb4MtSUrZcoeaeQ3BDzVCyqxw3VwSFpPiMTmn4GE",
+          "mintInfo": "HweVqvYPKwcxb1vsFxz3qMWKu4wqYWBpCraTFvinJrZZ",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "CwyxwCugWhWDMZTo2xCjVr3CqjLorpBMpqHKZCLYpPod"
+            }
+          ],
+          "active": true
+        }
+      ],
+      "stubOracles": [
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "publicKey": "7e7xcRkdb4uJ4A6xShYwBJrWJk5V4AmrEFqAPhSMvzSx"
+        }
+      ],
+      "serum3Markets": [
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "8JTrmcsZYABLL2HQcNnFo7q7osCVAsRW7m9ggE9Dj9Dw",
+          "marketIndex": 0,
+          "name": "SOL/USDC",
+          "baseTokenIndex": 4,
+          "quoteTokenIndex": 0,
+          "serumProgram": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+          "serumMarketExternal": "8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6",
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "Dp6vp6PfK29gvUMxbjMLhZHiTTFuiStGqvLrZNovvk17",
+          "marketIndex": 5,
+          "name": "wBTCpo/USDC",
+          "baseTokenIndex": 8,
+          "quoteTokenIndex": 0,
+          "serumProgram": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+          "serumMarketExternal": "3BAKsQd3RuhZKES2DGysMhjBdwjZYKYmxRqnSMtZ4KSN",
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "6M7Zrd9UtWc8bhfa6zVnsuN9QULskY6x5bPcZ543hVUQ",
+          "marketIndex": 2,
+          "name": "mSOL/USDC",
+          "baseTokenIndex": 5,
+          "quoteTokenIndex": 0,
+          "serumProgram": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+          "serumMarketExternal": "9Lyhks5bQQxb9EyyX55NtgKQzpM4WK7JCmeaWuQ5MoXD",
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "CjjmHLg9tLFZ86jun4Gbi9c6r6ndZqEiVTevhAf3br7x",
+          "marketIndex": 1,
+          "name": "ETH/USDC",
+          "baseTokenIndex": 3,
+          "quoteTokenIndex": 0,
+          "serumProgram": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+          "serumMarketExternal": "FZxi3yWkE5mMjyaZj6utmYL54QQYfMCKMcLaQZq4UwnA",
+          "active": false
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "Da4TtMXAKv9uf8sNvhco3agbV9Bvj9S6otgG3Xf9yCv3",
+          "marketIndex": 3,
+          "name": "ETHpo/USDC",
+          "baseTokenIndex": 3,
+          "quoteTokenIndex": 0,
+          "serumProgram": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+          "serumMarketExternal": "BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4",
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "4JptAVNgDYqn8XPcPQgVK8sy99bjyDuv5aTNnFuU8vC9",
+          "marketIndex": 4,
+          "name": "BONK/USDC",
+          "baseTokenIndex": 7,
+          "quoteTokenIndex": 0,
+          "serumProgram": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+          "serumMarketExternal": "8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71",
+          "active": true
+        }
+      ]
+    },
+    {
+      "publicKey": "Czdh6uGt9x7EW7TAvN7ZwheSwYjiv29z6VD4yavkmHqe",
+      "cluster": "MAINNET",
+      "name": "MAINNET.200",
+      "mangoProgramId": "4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg",
+      "insuranceVault": "GuiM3jt34uuCQPNQkdaCJMZ5XeBHyemttRDBCY8HvxUV",
+      "insuranceMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "insuranceMintDecimals": 6,
+      "perpMarkets": [
+        {
+          "group": "Czdh6uGt9x7EW7TAvN7ZwheSwYjiv29z6VD4yavkmHqe",
+          "publicKey": "GqmHjhyhgpYkPgu5NtEq6FHGraLop8d1FHcuCqvQMwgo",
+          "marketIndex": 0,
+          "name": "MNGO-PERP",
+          "baseDecimals": 6,
+          "baseLotSize": 100000,
+          "quoteLotSize": 10,
+          "oracle": "95HSiuPDcg18S2peG1XkftwUConMmphAAGkHzLJxXTVF",
+          "active": false,
+          "settleTokenIndex": 0
+        }
+      ],
+      "tokens": [
+        {
+          "group": "Czdh6uGt9x7EW7TAvN7ZwheSwYjiv29z6VD4yavkmHqe",
+          "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+          "tokenIndex": 1,
+          "symbol": "ETH",
+          "decimals": 8,
+          "oracle": "6cNTNmN5JiiJRDDmT9jVETRQHFer6CPnLu5sB7sJa4SW",
+          "mintInfo": "B4pt1G25pyEWpUZ2qKytRpCaGk8XsWCXXDYnDCinjfiv",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "BXMgtNFW8w7H34MZaeavD45obZdLw2RA9A65LoifbMMg"
+            }
+          ],
+          "active": false
+        },
+        {
+          "group": "Czdh6uGt9x7EW7TAvN7ZwheSwYjiv29z6VD4yavkmHqe",
+          "mint": "So11111111111111111111111111111111111111112",
+          "tokenIndex": 2,
+          "symbol": "SOL",
+          "decimals": 9,
+          "oracle": "CUefdnSmmA2iesNXLhMGhSBueDCTSX4NQUnAMFtwknL6",
+          "mintInfo": "A2nLp6LdEz4hwADNrpccvwqPH2Qw4CuwU6W4ZnsrLCba",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "AW6BM2paRj7BhK26rLhTNeDT73YRdB1Eg78xNmd9WPJC"
+            }
+          ],
+          "active": false
+        },
+        {
+          "group": "Czdh6uGt9x7EW7TAvN7ZwheSwYjiv29z6VD4yavkmHqe",
+          "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "tokenIndex": 0,
+          "symbol": "USDC",
+          "decimals": 6,
+          "oracle": "4HxZ8spXvVKtuji4WNj1K4zEygUj8SPW3ZQnaCUFN11w",
+          "mintInfo": "8hW94pJYGCE1vYjinZtXgzy2FSFNLTaD9ckqG5ZXJ6Dk",
+          "banks": [
+            {
+              "bankNum": 0,
+              "publicKey": "5TX5f6UA4vEyHmxrfhAQzubB9so6k6ojmYCcyYTzN1qK"
+            }
+          ],
+          "active": false
+        }
+      ],
+      "stubOracles": [
+        {
+          "group": "Czdh6uGt9x7EW7TAvN7ZwheSwYjiv29z6VD4yavkmHqe",
+          "mint": "MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac",
+          "publicKey": "95HSiuPDcg18S2peG1XkftwUConMmphAAGkHzLJxXTVF"
+        },
+        {
+          "group": "Czdh6uGt9x7EW7TAvN7ZwheSwYjiv29z6VD4yavkmHqe",
+          "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+          "publicKey": "6cNTNmN5JiiJRDDmT9jVETRQHFer6CPnLu5sB7sJa4SW"
+        },
+        {
+          "group": "Czdh6uGt9x7EW7TAvN7ZwheSwYjiv29z6VD4yavkmHqe",
+          "mint": "So11111111111111111111111111111111111111112",
+          "publicKey": "CUefdnSmmA2iesNXLhMGhSBueDCTSX4NQUnAMFtwknL6"
+        },
+        {
+          "group": "Czdh6uGt9x7EW7TAvN7ZwheSwYjiv29z6VD4yavkmHqe",
+          "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "publicKey": "4HxZ8spXvVKtuji4WNj1K4zEygUj8SPW3ZQnaCUFN11w"
+        }
+      ],
+      "serum3Markets": [
+        {
+          "group": "Czdh6uGt9x7EW7TAvN7ZwheSwYjiv29z6VD4yavkmHqe",
+          "publicKey": "6FCuSyVdekzM5yoVE47ndps7sXcbRgbbXv56d5yU38S2",
+          "marketIndex": 1,
+          "name": "SOL/USDC",
+          "baseTokenIndex": 2,
+          "quoteTokenIndex": 0,
+          "serumProgram": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+          "serumMarketExternal": "8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6",
+          "active": false
+        }
+      ]
+    }
+  ]
+}

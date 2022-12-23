@@ -1,0 +1,9 @@
+.venv/
+build
+.idea
+id.json
+config.json
+.DS_Store
+**/__pycache__/
+dist/*
+.swp
