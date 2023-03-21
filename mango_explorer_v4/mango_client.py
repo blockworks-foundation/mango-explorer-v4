@@ -1,5 +1,5 @@
 import asyncio
-from functools import total_ordering
+import itertools
 import sys
 import json
 import logging
@@ -413,12 +413,22 @@ class MangoClient():
                         elif not fixed_item and oracle_pegged_item:
                             yield oracle_pegged_item; oracle_pegged_item = next(oracle_pegged_items, None)
 
-                return {
+                orderbook = {
                     'symbol': symbol,
                     'bids': [[item.ui_price, item.ui_size] for item in items(bids, 'bids')],
                     'asks': [[item.ui_price, item.ui_size] for item in items(asks, 'asks')],
                     'slot': accounts.context.slot
                 }
+
+                for side in {'bids', 'asks'}:
+                    orders = []
+
+                    for key, groups in itertools.groupby(orderbook.get(side, []), lambda order: order[0]):
+                        orders.append([key, float(sum([Decimal(str(size)) for price, size in groups]))])
+
+                    orderbook[side] = orders
+
+                return orderbook
 
     async def snapshots_l2(self, symbol: str, depth: int = 50):
         serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]

@@ -29,7 +29,7 @@ async def main():
         mango_account_pk=config['mango_account_pk']
     )
 
-    print(await mango_client.orderbook_l2(args.symbol, args.depth))
+    print(json.dumps(await mango_client.orderbook_l2(args.symbol, args.depth)))
 
     # {
     #   'symbol': 'SOL/USDC',
