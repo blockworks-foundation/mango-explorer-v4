@@ -1,4 +1,5 @@
 import asyncio
+from functools import total_ordering
 import sys
 import json
 import logging
@@ -7,9 +8,10 @@ import re
 import time
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Literal, Any
+from typing import Literal, Any, Tuple
 
 from .constants import RUST_I64_MIN, RUST_U64_MAX, RUST_I64_MAX, QUOTE_DECIMALS
+from .oracles import pyth
 
 import base58
 from anchorpy import Provider, Wallet
@@ -23,7 +25,10 @@ from solana.transaction import AccountMeta, Transaction
 from solders.rpc.responses import AccountNotification
 
 from mango_explorer_v4.types.side import Bid, Ask
+from mango_explorer_v4.types.place_order_type import PlaceOrderTypeKind, Limit, ImmediateOrCancel, PostOnly, Market, PostOnlySlide
+from mango_explorer_v4.types.order_tree_root import OrderTreeRoot
 from mango_explorer_v4.accounts.bank import Bank
+from mango_explorer_v4.accounts.group import Group
 from mango_explorer_v4.accounts.book_side import BookSide
 from mango_explorer_v4.accounts.mango_account import MangoAccount
 from mango_explorer_v4.accounts.mint_info import MintInfo
@@ -37,6 +42,7 @@ from mango_explorer_v4.instructions.serum3_create_open_orders import Serum3Creat
 from mango_explorer_v4.instructions.serum3_place_order import Serum3PlaceOrderArgs, Serum3PlaceOrderAccounts, serum3_place_order
 from mango_explorer_v4.instructions.perp_place_order import PerpPlaceOrderArgs, PerpPlaceOrderAccounts, perp_place_order
 from mango_explorer_v4.instructions.perp_cancel_all_orders import PerpCancelAllOrdersArgs, PerpCancelAllOrdersAccounts, perp_cancel_all_orders
+from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrderPeggedArgs, PerpPlaceOrderPeggedAccounts, perp_place_order_pegged
 from mango_explorer_v4.program_id import SERUM_PROGRAM_ID, MANGO_PROGRAM_ID
 from mango_explorer_v4.types import serum3_side, serum3_self_trade_behavior, serum3_order_type
 from mango_explorer_v4.types import place_order_type
@@ -61,6 +67,7 @@ class MangoClient():
     mint_infos: [MintInfo]
     perp_markets: [PerpMarket]
     rpc_url: str
+    group: Group
 
     @staticmethod
     async def connect(
@@ -100,6 +107,8 @@ class MangoClient():
         # TODO: ^ Make this fetch from https://mango-transaction-log.herokuapp.com/v4/group-metadata instead
 
         group_config = [group_config for group_config in ids['groups'] if PublicKey(group_config['publicKey']) == mango_account.group][0]
+
+        group = await Group.fetch(provider.connection, PublicKey(group_config['publicKey']))
 
         perp_market_configs = [
             perp_market_config for perp_market_config in group_config['perpMarkets'] if perp_market_config['active']
@@ -158,8 +167,8 @@ class MangoClient():
         )
 
         return MangoClient(
-            provider,
-            mango_account_pk,
+            provider=provider,
+            mango_account_pk=mango_account_pk,
             mango_account=mango_account,
             group_config=group_config,
             serum_market_configs=serum_market_configs,
@@ -169,7 +178,8 @@ class MangoClient():
             banks=banks,
             mint_infos=mint_infos,
             perp_markets=perp_markets,
-            rpc_url=rpc_url
+            rpc_url=rpc_url,
+            group=group
         )
 
     def symbols(self):
@@ -244,7 +254,8 @@ class MangoClient():
                 orderbook = {
                     'symbol': symbol,
                     'bids': [[bid.price, bid.size] for bid in bids.get_l2(depth)],
-                    'asks': [[ask.price, ask.size] for ask in asks.get_l2(depth)]
+                    'asks': [[ask.price, ask.size] for ask in asks.get_l2(depth)],
+                    'slot': response.context.slot
                 }
 
                 return orderbook
@@ -268,18 +279,37 @@ class MangoClient():
                     is_oracle_pegged: bool
                     oracle_pegged_properties: Any
 
-
                     @staticmethod
                     def build(
                         perp_market: PerpMarket,
                         leaf_node: LeafNode,
                         side: Literal['bids', 'asks'],
+                        oracle_price: float,
                         is_oracle_pegged: bool = False
                     ):
                         if is_oracle_pegged:
-                            price_lots = leaf_node.key >> 64
+                            price_data = leaf_node.key >> 64
+
+                            price_offset = price_data - (1 << 63)
+
+                            price_lots = perp_market.ui_price_to_lots(oracle_price) + price_offset
+
+                            is_invalid = {
+                                'bids': price_lots > leaf_node.peg_limit,
+                                'asks': leaf_node.peg_limit > price_lots
+                            }[side]
+
+                            oracle_pegged_properties = {
+                                'is_invalid': is_invalid,
+                                'price_offset': price_offset,
+                                'ui_price_offset': perp_market.price_lots_to_ui(price_offset),
+                                'peg_limit': leaf_node.peg_limit,
+                                'ui_peg_limit': perp_market.price_lots_to_ui(leaf_node.peg_limit),
+                            }
                         else:
                             price_lots = leaf_node.key >> 64
+
+                            oracle_pegged_properties = None
 
                         now = int(time.time())
 
@@ -306,50 +336,29 @@ class MangoClient():
                             perp_market.perp_market_index,
                             is_expired,
                             is_oracle_pegged,
-                            None
+                            oracle_pegged_properties
                         )
-
 
                 perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
                 perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
 
-                [bids, asks] = await BookSide.fetch_multiple(self.provider.connection, [perp_market.bids, perp_market.asks])
+                accounts = await self.provider.connection.get_multiple_accounts([perp_market.bids, perp_market.asks, perp_market.oracle])
 
-                # TODO: Abstract away the pretty much the same body in fixed_items() and oracle_pegged_items()
+                [raw_bids, raw_asks, raw_oracle] = accounts.value
+
+                [bids, asks] = [BookSide.decode(raw_bids.data), BookSide.decode(raw_asks.data)]
+
+                oracle = pyth.PRICE.parse(raw_oracle.data)
+
+                oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
+
                 def items(book_side: BookSide, side: Literal['bids', 'asks']):
-                    def fixed_items():
-                        if book_side.roots[0].leaf_count == 0:
+                    def entries(order_tree_root: OrderTreeRoot, is_oracle_pegged: bool):
+                        if order_tree_root.leaf_count == 0:
                             return
 
-                        stack = [book_side.roots[0].maybe_node]
-
-                        [left, right] = [1, 0] if side == 'bids' else [0, 1]
-
-                        while len(stack) > 0:
-                            index = stack.pop()
-
-                            node = book_side.nodes.nodes[index]
-
-                            match node.tag:
-                                case 1:
-                                    inner_node = InnerNode.layout.parse(bytes([1] + node.data))
-
-                                    stack.extend([inner_node.children[right], inner_node.children[left]])
-                                case 2:
-                                    leaf_node: LeafNode = LeafNode.layout.parse(bytes([2] + node.data))
-
-                                    yield PerpOrder.build(
-                                        perp_market,
-                                        leaf_node,
-                                        side
-                                    )
-
-                    def oracle_pegged_items():
-                        if book_side.roots[1].leaf_count == 0:
-                            return
-
-                        stack = [book_side.roots[1].maybe_node]
+                        stack = [order_tree_root.maybe_node]
 
                         [left, right] = [1, 0] if side == 'bids' else [0, 1]
 
@@ -370,15 +379,46 @@ class MangoClient():
                                         perp_market,
                                         leaf_node,
                                         side,
-                                        True
+                                        oracle_price,
+                                        is_oracle_pegged
                                     )
 
-                    return [
-                        list(fixed_items()),
-                        list(oracle_pegged_items())
-                    ]
+                    fixed_items = entries(book_side.roots[0], False)
 
-                return items(bids, 'bids')
+                    oracle_pegged_items = entries(book_side.roots[1], True)
+
+                    def is_better(side: Literal['bids', 'asks'], a: PerpOrder, b: PerpOrder):
+                        # TODO: This can be comparison operators instead
+                        if a.price == b.price:
+                            return a.seq_num < b.seq_num
+                            # ^ If prices are equal, prefer the oldest created
+                        else:
+                            return {
+                                'bids': a.price > b.price,
+                                'asks': a.price < b.price
+                            }[side]
+
+                    fixed_item = next(fixed_items, None)
+
+                    oracle_pegged_item = next(oracle_pegged_items, None)
+
+                    while fixed_item or oracle_pegged_item:
+                        if fixed_item and oracle_pegged_item:
+                            if is_better(side, fixed_item, oracle_pegged_item):
+                                yield fixed_item; fixed_item = next(fixed_items, None)
+                            else:
+                                yield oracle_pegged_item; oracle_pegged_item = next(oracle_pegged_items, None)
+                        elif fixed_item and not oracle_pegged_item:
+                            yield fixed_item; fixed_item = next(fixed_items, None)
+                        elif not fixed_item and oracle_pegged_item:
+                            yield oracle_pegged_item; oracle_pegged_item = next(oracle_pegged_items, None)
+
+                return {
+                    'symbol': symbol,
+                    'bids': [[item.ui_price, item.ui_size] for item in items(bids, 'bids')],
+                    'asks': [[item.ui_price, item.ui_size] for item in items(asks, 'asks')],
+                    'slot': accounts.context.slot
+                }
 
     async def snapshots_l2(self, symbol: str, depth: int = 50):
         serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
@@ -911,3 +951,97 @@ class MangoClient():
                 ]
             ]
         ]
+
+    def make_place_perp_pegged_order_ix(
+        self,
+        symbol: str,
+        side: Literal['bids', 'asks'],
+        price_offset: float,
+        peg_limit: float,
+        quantity: float,
+        max_quote_quantity: float = None,
+        client_order_id: int = int(time.time()),
+        expiry_timestamp: int = 0,
+        limit: int = 10,
+        reduce_only: bool = False
+    ):
+        perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
+
+        perp_market: PerpMarket = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
+
+        perp_place_order_pegged_args: PerpPlaceOrderPeggedArgs = {
+            'side': {'bids': Bid, 'asks': Ask}[side],
+            'price_offset_lots': perp_market.ui_price_to_lots(price_offset),
+            'peg_limit': perp_market.ui_price_to_lots(peg_limit),
+            'max_base_lots': perp_market.ui_base_to_lots(quantity),
+            'max_quote_lots': perp_market.ui_quote_to_lots(max_quote_quantity) if max_quote_quantity else RUST_I64_MAX,
+            'client_order_id': client_order_id,
+            'order_type': Limit,
+            'reduce_only': reduce_only,
+            'expiry_timestamp': expiry_timestamp,
+            'limit': limit,
+            'max_oracle_staleness_slots': -1
+        }
+
+        perp_place_order_pegged_accounts: PerpPlaceOrderPeggedAccounts = {
+            'group': PublicKey(self.group_config['publicKey']),
+            'account': PublicKey(self.mango_account_pk),
+            'owner': self.mango_account.owner,
+            'perp_market': PublicKey(perp_market_config['publicKey']),
+            'bids': perp_market.bids,
+            'asks': perp_market.asks,
+            'event_queue': perp_market.event_queue,
+            'oracle': perp_market.oracle
+        }
+
+        remaining_accounts = self._health_remaining_accounts(
+            'fixed',
+            [bank for bank in self.banks if bank.token_index == 0],
+            [perp_market]
+        )
+
+        return perp_place_order_pegged(
+            perp_place_order_pegged_args,
+            perp_place_order_pegged_accounts,
+            remaining_accounts=remaining_accounts
+        )
+
+    async def place_perp_pegged_order(
+        self,
+        symbol: str,
+        side: Literal['bids', 'asks'],
+        price_offset: float,
+        peg_limit: float,
+        quantity: float,
+        max_quote_quantity: float = None,
+        client_order_id: int = int(time.time()),
+        expiry_timestamp: int = 0,
+        limit: int = 10,
+        reduce_only: bool = False
+    ):
+        tx = Transaction()
+
+        recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
+
+        tx.recent_blockhash = str(recent_blockhash)
+
+        tx.add(
+            self.make_place_perp_pegged_order_ix(
+                symbol,
+                side,
+                price_offset,
+                peg_limit,
+                quantity,
+                max_quote_quantity,
+                client_order_id,
+                expiry_timestamp,
+                limit,
+                reduce_only
+            )
+        )
+
+        tx.sign(self.provider.wallet.payer)
+
+        response = await self.provider.send(tx)
+
+        return response

@@ -337,7 +337,27 @@ class PerpMarket:
             reserved=obj["reserved"],
         )
 
+    # TODO: Transform all convertors into functions
     def __post_init__(self):
         self.price_lots_to_ui_converter = (((Decimal(10) ** Decimal(self.base_decimals - QUOTE_DECIMALS)) * Decimal(self.quote_lot_size)) / Decimal(self.base_lot_size))
         self.base_lots_to_ui_converter = (Decimal(self.base_lot_size) / (Decimal(10) ** Decimal(self.base_decimals)))
         self.quote_lots_to_ui_converter = (Decimal(self.quote_lot_size) / (Decimal(10) ** Decimal(QUOTE_DECIMALS)))
+
+    def price_lots_to_ui(self, price_lots: int):
+        return float(Decimal(price_lots) * Decimal(self.price_lots_to_ui_converter))
+
+    def base_lots_to_ui(self, base_lots: int):
+        raise NotImplementedError
+
+    def quote_lots_to_ui(self, quote_lots: int):
+        raise NotImplementedError
+
+    def ui_price_to_lots(self, ui_price: float) -> int:
+        return int(Decimal(ui_price * 10 ** QUOTE_DECIMALS) * Decimal(self.base_lot_size) / Decimal(self.quote_lot_size * 10 ** self.base_decimals))
+
+    def ui_base_to_lots(self, ui_base: float) -> int:
+        return int(Decimal(ui_base * 10 ** self.base_decimals) / Decimal(self.base_lot_size))
+
+    def ui_quote_to_lots(self, ui_quote: float) -> int:
+        return int(Decimal(ui_quote * 10 ** QUOTE_DECIMALS) / Decimal(self.quote_lot_size))
+
