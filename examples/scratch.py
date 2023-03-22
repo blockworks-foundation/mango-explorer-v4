@@ -10,5 +10,3 @@ for side in {'bids', 'asks'}:
         orders.append([key, float(sum([Decimal(str(size)) for price, size in groups]))])
 
     print(side, orders)
-
-
