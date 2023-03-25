@@ -35,3 +35,6 @@ class I80F48:
 
     def parsed(self):
         return float(Decimal(self.val) / Decimal(self.MULTIPLIER_BIG))
+
+    def __float__(self):
+        return float(Decimal(self.val) / Decimal(self.MULTIPLIER_BIG))

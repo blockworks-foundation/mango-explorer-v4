@@ -12,7 +12,7 @@ from typing import Literal, Any
 
 from .constants import RUST_U64_MAX, RUST_I64_MAX
 from .oracles import pyth
-from .constructs import perp_order
+from .constructs.book_side_items import BookSideItems
 
 import base58
 from anchorpy import Provider, Wallet
@@ -276,18 +276,10 @@ class MangoClient():
 
                 orderbook = {
                     'symbol': symbol,
-                    'bids': [[item.ui_price, item.ui_size] for item in perp_order.items(bids, perp_market, 'bids', oracle_price)],
-                    'asks': [[item.ui_price, item.ui_size] for item in perp_order.items(asks, perp_market, 'asks', oracle_price)],
+                    'bids': BookSideItems('bids', bids, perp_market, oracle_price).l2(),
+                    'asks': BookSideItems('asks', asks, perp_market, oracle_price).l2(),
                     'slot': accounts.context.slot
                 }
-
-                for side in {'bids', 'asks'}:
-                    orders = []
-
-                    for key, groups in itertools.groupby(orderbook.get(side, []), lambda order: order[0]):
-                        orders.append([key, float(sum([Decimal(str(size)) for price, size in groups]))])
-
-                    orderbook[side] = orders
 
                 return orderbook
 
@@ -918,6 +910,7 @@ class MangoClient():
         return response
 
     async def funding_rate(self, symbol: str):
+        # TODO: Maybe fetch the perp market alongside the other data, just so that it's always within the same slot
         perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
         perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
@@ -928,8 +921,12 @@ class MangoClient():
 
         [bids, asks] = [BookSide.decode(raw_bids.data), BookSide.decode(raw_asks.data)]
 
-        oracle = pyth.PRICE.parse(raw_oracle.data)
+        oracle = pyth.PRICE.parse(raw_oracle.data).agg.price
 
-        oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
+        oracle_price = oracle.agg.price * Decimal(10) ** oracle.expo
+
+        min_funding, max_funding = float(perp_market.min_funding), float(perp_market.max_funding)
+
+        impact_quantity_ui = perp_market.base_lots_to_ui(perp_market.impact_quantity)
 
         return None

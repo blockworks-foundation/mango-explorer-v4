@@ -340,14 +340,14 @@ class PerpMarket:
     # TODO: Transform all convertors into functions
     def __post_init__(self):
         self.price_lots_to_ui_converter = (((Decimal(10) ** Decimal(self.base_decimals - QUOTE_DECIMALS)) * Decimal(self.quote_lot_size)) / Decimal(self.base_lot_size))
-        self.base_lots_to_ui_converter = (Decimal(self.base_lot_size) / (Decimal(10) ** Decimal(self.base_decimals)))
+        self.base_lots_to_ui_converter = (Decimal(self.base_lot_size) / Decimal(10) ** Decimal(self.base_decimals))
         self.quote_lots_to_ui_converter = (Decimal(self.quote_lot_size) / (Decimal(10) ** Decimal(QUOTE_DECIMALS)))
 
     def price_lots_to_ui(self, price_lots: int):
         return float(Decimal(price_lots) * Decimal(self.price_lots_to_ui_converter))
 
     def base_lots_to_ui(self, base_lots: int):
-        raise NotImplementedError
+        return float(Decimal(base_lots) * (Decimal(self.base_lot_size) / Decimal(10) ** Decimal(self.base_decimals)))
 
     def quote_lots_to_ui(self, quote_lots: int):
         raise NotImplementedError
