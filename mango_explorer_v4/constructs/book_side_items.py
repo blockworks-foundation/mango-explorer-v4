@@ -155,4 +155,12 @@ class BookSideItems:
         return orders
 
     def impact_price(self, impact_quantity: float):
-        pass
+        accum = 0
+
+        for price, size in self.l2():
+            accum += size
+
+            if size >= impact_quantity:
+                return price
+
+        return None

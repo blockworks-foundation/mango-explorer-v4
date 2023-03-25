@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal, Any
 
-from .constants import RUST_U64_MAX, RUST_I64_MAX
+from .constants import RUST_U64_MAX, RUST_I64_MAX, QUOTE_DECIMALS
 from .oracles import pyth
 from .constructs.book_side_items import BookSideItems
 
@@ -921,12 +921,27 @@ class MangoClient():
 
         [bids, asks] = [BookSide.decode(raw_bids.data), BookSide.decode(raw_asks.data)]
 
-        oracle = pyth.PRICE.parse(raw_oracle.data).agg.price
+        oracle = pyth.PRICE.parse(raw_oracle.data)
 
-        oracle_price = oracle.agg.price * Decimal(10) ** oracle.expo
+        oracle_price = float(Decimal(str(oracle.agg.price)) * Decimal(10) ** oracle.expo)
+
+        [bids, asks] = [BookSideItems('bids', bids, perp_market, oracle_price), BookSideItems('asks', asks, perp_market, oracle_price)]
 
         min_funding, max_funding = float(perp_market.min_funding), float(perp_market.max_funding)
 
-        impact_quantity_ui = perp_market.base_lots_to_ui(perp_market.impact_quantity)
+        impact_quantity = perp_market.base_lots_to_ui(perp_market.impact_quantity)
 
-        return None
+        bid, ask = [bids.impact_price(impact_quantity), asks.impact_price(impact_quantity)]
+
+        if bid and ask:
+            mid_price = (bid + ask) / 2
+
+            funding = min(max(mid_price / oracle_price - 1, min_funding), max_funding)
+        elif bid:
+            funding = max_funding
+        elif ask:
+            funding = min_funding
+        else:
+            funding = 0
+
+        return funding / 24 / 10 ** QUOTE_DECIMALS
