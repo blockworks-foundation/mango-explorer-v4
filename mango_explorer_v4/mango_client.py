@@ -310,7 +310,7 @@ class MangoClient():
         yield await self.orderbook_l2(symbol, depth)
 
         async def snapshots(side):
-            async with connect('wss://mango.rpcpool.com/0f9acc0d45173b51bf7d7e09c1e5') as websocket:
+            async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
                 await websocket.account_subscribe(getattr(serum_market_external.state, side)(), Processed, 'jsonParsed')
 
                 async for message in websocket:
