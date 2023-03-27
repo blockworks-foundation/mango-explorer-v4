@@ -1022,27 +1022,106 @@ class MangoClient():
 
         match market_type:
             case 'spot':
-                pass
+                raise NotImplementedError('Spot markets fills are not implemented yet')
             case 'perpetual':
                 perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
                 perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
 
-                event_queue = await EventQueue.fetch(self.provider.connection, perp_market.event_queue)
+                response = await self.provider.connection.get_account_info(perp_market.event_queue)
+
+                event_queue = EventQueue.layout.parse(response.value.data)
 
                 fills = sorted(
                     [FillEvent.layout.parse(bytes([event.event_type] + event.padding)) for event in event_queue.buf if event.event_type == 0],
                     key=lambda fill: fill.seq_num
                 )
 
-                return [
-                    {
-                        'taker': str(fill.taker),
-                        'maker': str(fill.maker),
-                        'side': 'bids' if fill.taker_side else 'asks',
-                        'price': perp_market.price_lots_to_ui(fill.price),
-                        'size': perp_market.base_lots_to_ui(fill.quantity),
-                        'timestamp': fill.timestamp
-                    }
-                    for fill in fills
-                ]
+                return {
+                    'symbol': symbol,
+                    'fills': [
+                        {
+                            'seq_num': fill.seq_num,
+                            'taker': str(fill.taker),
+                            'maker': str(fill.maker),
+                            'side': 'bids' if fill.taker_side else 'asks',
+                            'price': perp_market.price_lots_to_ui(fill.price),
+                            'size': perp_market.base_lots_to_ui(fill.quantity),
+                            'timestamp': fill.timestamp
+                        }
+                        for fill in fills
+                    ],
+                    'slot': response.context.slot
+                }
+
+    async def incremental_fills(self, symbol: str):
+        market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
+
+        match market_type:
+            case 'spot':
+                raise NotImplementedError('Spot markets fills are not implemented yet')
+            case 'perpetual':
+                perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
+
+                perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
+
+                lead = None
+
+                async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
+                    await websocket.account_subscribe(perp_market.event_queue, Processed, 'jsonParsed')
+
+                    async for message in websocket:
+                        for submessage in message:
+                            if not isinstance(submessage, AccountNotification):
+                                continue
+
+                            event_queue = EventQueue.layout.parse(submessage.result.value.data)
+
+                            fills = sorted(
+                                [FillEvent.layout.parse(bytes([event.event_type] + event.padding)) for event in event_queue.buf if event.event_type == 0],
+                                key=lambda fill: fill.seq_num
+                            )
+
+                            if not lead:
+                                yield {
+                                    'symbol': symbol,
+                                    'is_snapshot': True,
+                                    'fills': [
+                                        {
+                                            'seq_num': fill.seq_num,
+                                            'taker': str(fill.taker),
+                                            'maker': str(fill.maker),
+                                            'side': 'bids' if fill.taker_side else 'asks',
+                                            'price': perp_market.price_lots_to_ui(fill.price),
+                                            'size': perp_market.base_lots_to_ui(fill.quantity),
+                                            'timestamp': fill.timestamp
+                                        }
+                                        for fill in fills
+                                    ],
+                                    'slot': submessage.result.context.slot
+                                }
+                            else:
+                                fills = [fill for fill in fills if fill.seq_num > lead]
+
+                                if len(fills) == 0:
+                                    continue
+
+                                yield {
+                                    'symbol': symbol,
+                                    'is_snapshot': False,
+                                    'fills': [
+                                        {
+                                            'seq_num': fill.seq_num,
+                                            'taker': str(fill.taker),
+                                            'maker': str(fill.maker),
+                                            'side': 'bids' if fill.taker_side else 'asks',
+                                            'price': perp_market.price_lots_to_ui(fill.price),
+                                            'size': perp_market.base_lots_to_ui(fill.quantity),
+                                            'timestamp': fill.timestamp
+                                        }
+                                        for fill in fills
+                                    ],
+                                    'slot': submessage.result.context.slot
+                                }
+
+                            lead = fills[-1:][0].seq_num

@@ -30,8 +30,8 @@ async def main():
         mango_account_pk=config['mango_account_pk']
     )
 
-    for fill in await mango_client.fills(args.symbol):
-        print(fill)
+    print(json.dumps(await mango_client.fills(args.symbol)))
+
 
 if __name__ == '__main__':
     asyncio.run(main())
