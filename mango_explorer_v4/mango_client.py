@@ -285,57 +285,124 @@ class MangoClient():
                 return orderbook
 
     async def snapshots_l2(self, symbol: str, depth: int = 50):
-        serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
-
-        serum_market_index = serum_market_config['marketIndex']
-
-        serum_market = [
-            serum_market
-            for serum_market in self.serum_markets
-            if serum_market.market_index == serum_market_index
-        ][0]
-
-        serum_market_external = [
-            serum_market_external
-            for serum_market_external in self.serum_markets_external
-            if serum_market_external.state.public_key() == serum_market.serum_market_external
-        ][0]
-
-        orderbook = {
-            'symbol': symbol,
-            'bids': None,
-            'asks': None
-        }
+        # TODO: Validate the symbol exists
+        market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
 
         yield await self.orderbook_l2(symbol, depth)
 
-        async def snapshots(side):
-            async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
-                await websocket.account_subscribe(getattr(serum_market_external.state, side)(), Processed, 'jsonParsed')
+        match market_type:
+            case 'spot':
+                serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
 
-                async for message in websocket:
-                    for submessage in message:
-                        if not isinstance(submessage, AccountNotification):
+                serum_market_index = serum_market_config['marketIndex']
+
+                serum_market = [
+                    serum_market
+                    for serum_market in self.serum_markets
+                    if serum_market.market_index == serum_market_index
+                ][0]
+
+                serum_market_external = [
+                    serum_market_external
+                    for serum_market_external in self.serum_markets_external
+                    if serum_market_external.state.public_key() == serum_market.serum_market_external
+                ][0]
+
+                orderbook = {
+                    'symbol': symbol,
+                    'bids': None,
+                    'asks': None
+                }
+
+                async def snapshots(side):
+                    async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
+                        await websocket.account_subscribe(getattr(serum_market_external.state, side)(), Processed, 'jsonParsed')
+
+                        async for message in websocket:
+                            for submessage in message:
+                                if not isinstance(submessage, AccountNotification):
+                                    continue
+
+                                orders = [
+                                    [order.price, order.size]
+                                    for order in OrderBook.from_bytes(
+                                        serum_market_external.state,
+                                        submessage.result.value.data
+                                    ).get_l2(depth)
+                                ]
+
+                                yield side, orders
+
+                async with aiostream.stream.merge(*[stream for stream in [snapshots(side) for side in ['bids', 'asks']]]).stream() as streamer:
+                    async for side, orders in streamer:
+                        orderbook[side] = orders
+
+                        if not all([orderbook['bids'], orderbook['asks']]):
                             continue
 
-                        orders = [
-                            [order.price, order.size]
-                            for order in OrderBook.from_bytes(
-                                serum_market_external.state,
-                                submessage.result.value.data
-                            ).get_l2(depth)
-                        ]
+                        yield orderbook
+            case 'perpetual':
+                perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
-                        yield side, orders
+                perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
 
-        async with aiostream.stream.merge(*[stream for stream in [snapshots(side) for side in ['bids', 'asks']]]).stream() as streamer:
-            async for side, orders in streamer:
-                orderbook[side] = orders
+                state = {
+                    'oracle_price': None
+                }
 
-                if not all([orderbook['bids'], orderbook['asks']]):
-                    continue
+                orderbook = {
+                    'symbol': symbol,
+                    'bids': None,
+                    'asks': None
+                }
 
-                yield orderbook
+                async def oracle_price():
+                    async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
+                        await websocket.account_subscribe(perp_market.oracle, Processed, 'jsonParsed')
+
+                        async for message in websocket:
+                            for submessage in message:
+                                if not isinstance(submessage, AccountNotification):
+                                    continue
+
+                                oracle = pyth.PRICE.parse(submessage.result.value.data)
+
+                                yield {
+                                    'channel': 'oracle_price',
+                                    'symbol': symbol,
+                                    'value': float(Decimal(str(oracle.agg.price)) * Decimal(10) ** Decimal(str(oracle.expo)))
+                                }
+
+                async def book(side):
+                    async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
+                        await websocket.account_subscribe(getattr(perp_market, side), Processed, 'jsonParsed')
+
+                        async for message in websocket:
+                            for submessage in message:
+                                if not isinstance(submessage, AccountNotification):
+                                    continue
+
+                            if not state['oracle_price']:
+                                continue
+
+                            yield {
+                                'channel': 'book',
+                                'side': side,
+                                'orders': BookSideItems(side, BookSide.decode(submessage.result.value.data), perp_market, state['oracle_price']).l2()
+                            }
+
+                async with aiostream.stream.merge(*[oracle_price(), *[book(side) for side in ['bids', 'asks']]]).stream() as streamer:
+                    async for message in streamer:
+                        match message['channel']:
+                            case 'oracle_price':
+                                state['oracle_price'] = message['value']
+                            case 'book':
+                                orderbook[message['side']] = message['orders']
+
+                        if not all([orderbook['bids'], orderbook['asks']]):
+                            continue
+
+                        yield orderbook
 
 
     def _health_remaining_accounts(
@@ -921,11 +988,9 @@ class MangoClient():
 
         accounts = await self.provider.connection.get_multiple_accounts([perp_market.bids, perp_market.asks, perp_market.oracle])
 
-        [raw_bids, raw_asks, raw_oracle] = accounts.value
+        raw_bids, raw_asks, raw_oracle = accounts.value
 
-        [bids, asks] = [BookSide.decode(raw_bids.data), BookSide.decode(raw_asks.data)]
-
-        oracle = pyth.PRICE.parse(raw_oracle.data)
+        bids, asks, oracle = BookSide.decode(raw_bids.data), BookSide.decode(raw_asks.data), pyth.PRICE.parse(raw_oracle.data)
 
         oracle_price = float(Decimal(str(oracle.agg.price)) * Decimal(10) ** oracle.expo)
 
