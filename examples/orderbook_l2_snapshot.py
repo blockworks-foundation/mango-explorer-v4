@@ -11,7 +11,8 @@ async def main():
 
     parser.add_argument(
         '--symbol',
-        required=True
+        required=False,
+        default='SOL-PERP'
     )
 
     parser.add_argument(
@@ -30,24 +31,6 @@ async def main():
     )
 
     print(json.dumps(await mango_client.orderbook_l2(args.symbol, args.depth)))
-
-    # {
-    #   'symbol': 'SOL/USDC',
-    #   'slot': 168616506,
-    #   'bids': [
-    #       [11.826, 0.899],
-    #       [11.824, 39.436],
-    #       [11.82, 316.421],
-    #       [11.817, 1.43],
-    #       [11.816, 1.21]
-    #    ],
-    #  'asks': [
-    #       [11.839, 0.78],
-    #       [11.84, 44.392],
-    #       [11.841, 1.1],
-    #       [11.843, 300.89],
-    #       [11.844, 355.131]
-    #   ]}
 
 if __name__ == '__main__':
     asyncio.run(main())

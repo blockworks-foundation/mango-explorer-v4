@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal, Any
 
+import aiostream.stream
+
 from .constants import RUST_U64_MAX, RUST_I64_MAX, QUOTE_DECIMALS
 from .oracles import pyth
 from .constructs.book_side_items import BookSideItems
@@ -81,8 +83,7 @@ class MangoClient():
         rpc_url: str = 'https://mango.rpcpool.com/0f9acc0d45173b51bf7d7e09c1e5'
         # ^ Can use the default RPC endpoint or whichever so desired
     ):
-        # TODO: There's a bunch of asynchronous calls here, which could reasonably be parallelized
-        # to shorten the lib's init time, which is now sitting at around 2 seconds - annoying
+        # TODO: Parallelize asynchronous calls here to reduce load times - around 2 seconds right now
         provider = Provider(
             AsyncClient(rpc_url, Processed),
             Wallet(
@@ -308,31 +309,34 @@ class MangoClient():
 
         yield await self.orderbook_l2(symbol, depth)
 
-        # async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
-        async with connect('wss://mango.rpcpool.com/0f9acc0d45173b51bf7d7e09c1e5') as websocket:
-            remap = {}
+        async def snapshots(side):
+            async with connect('wss://mango.rpcpool.com/0f9acc0d45173b51bf7d7e09c1e5') as websocket:
+                await websocket.account_subscribe(getattr(serum_market_external.state, side)(), Processed, 'jsonParsed')
 
-            await websocket.account_subscribe(serum_market_external.state.bids(), Processed, 'jsonParsed')
+                async for message in websocket:
+                    for submessage in message:
+                        if not isinstance(submessage, AccountNotification):
+                            continue
 
-            remap[(await websocket.recv())[0].result] = 'bids'
+                        orders = [
+                            [order.price, order.size]
+                            for order in OrderBook.from_bytes(
+                                serum_market_external.state,
+                                submessage.result.value.data
+                            ).get_l2(depth)
+                        ]
 
-            await websocket.account_subscribe(serum_market_external.state.asks(), Processed, 'jsonParsed')
+                        yield side, orders
 
-            remap[(await websocket.recv())[0].result] = 'asks'
+        async with aiostream.stream.merge(*[stream for stream in [snapshots(side) for side in ['bids', 'asks']]]).stream() as streamer:
+            async for side, orders in streamer:
+                orderbook[side] = orders
 
-            async for message in websocket:
-                for submessage in message:
-                    if not isinstance(submessage, AccountNotification):
-                        continue
+                if not all([orderbook['bids'], orderbook['asks']]):
+                    continue
 
-                    side = OrderBook.from_bytes(serum_market_external.state, submessage.result.value.data)
+                yield orderbook
 
-                    orderbook[remap[submessage.subscription]] = [[order.price, order.size] for order in side.get_l2(depth)]
-
-                    if not all([orderbook['bids'], orderbook['asks']]):
-                        continue
-
-                    yield orderbook
 
     def _health_remaining_accounts(
         self,

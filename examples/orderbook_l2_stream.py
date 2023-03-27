@@ -11,7 +11,8 @@ async def main():
 
     parser.add_argument(
         '--symbol',
-        required=True
+        required=False,
+        default='SOL/USDC'
     )
 
     parser.add_argument(
