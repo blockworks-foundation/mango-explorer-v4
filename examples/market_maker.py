@@ -31,7 +31,7 @@ async def main():
     }
 
     async def poll_orderbook():
-        async for orderbook in mango_client.snapshots_l2(symbol, 5):
+        async for orderbook in mango_client.incremental_orderbook_l2(symbol, 5):
             state['orderbook'] = orderbook
 
     async def poll_blockhash():

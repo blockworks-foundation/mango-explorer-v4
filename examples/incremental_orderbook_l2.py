@@ -30,8 +30,8 @@ async def main():
         mango_account_pk=config['mango_account_pk']
     )
 
-    async for snapshot in mango_client.snapshots_l2(args.symbol, args.depth):
-        print(snapshot)
+    async for orderbook in mango_client.incremental_orderbook_l2(args.symbol, args.depth):
+        print(orderbook)
 
 
 if __name__ == '__main__':

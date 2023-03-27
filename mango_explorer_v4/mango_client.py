@@ -29,7 +29,10 @@ from solders.rpc.responses import AccountNotification
 
 from mango_explorer_v4.types.side import Bid, Ask
 from mango_explorer_v4.types.place_order_type import Limit
-from mango_explorer_v4.types.order_tree_root import OrderTreeRoot
+from mango_explorer_v4.types.any_event import AnyEvent
+from mango_explorer_v4.types.out_event import OutEvent
+from mango_explorer_v4.types.fill_event import FillEvent
+from mango_explorer_v4.accounts.event_queue import EventQueue
 from mango_explorer_v4.accounts.bank import Bank
 from mango_explorer_v4.accounts.group import Group
 from mango_explorer_v4.accounts.book_side import BookSide
@@ -37,8 +40,6 @@ from mango_explorer_v4.accounts.mango_account import MangoAccount
 from mango_explorer_v4.accounts.mint_info import MintInfo
 from mango_explorer_v4.accounts.serum3_market import Serum3Market
 from mango_explorer_v4.accounts.perp_market import PerpMarket
-from mango_explorer_v4.types.inner_node import InnerNode
-from mango_explorer_v4.types.leaf_node import LeafNode
 from mango_explorer_v4.instructions.serum3_cancel_all_orders import Serum3CancelAllOrdersAccounts, Serum3CancelAllOrdersArgs, serum3_cancel_all_orders
 from mango_explorer_v4.instructions.serum3_create_open_orders import Serum3CreateOpenOrdersAccounts, serum3_create_open_orders
 from mango_explorer_v4.instructions.serum3_place_order import Serum3PlaceOrderArgs, Serum3PlaceOrderAccounts, serum3_place_order
@@ -284,7 +285,7 @@ class MangoClient():
 
                 return orderbook
 
-    async def snapshots_l2(self, symbol: str, depth: int = 50):
+    async def incremental_orderbook_l2(self, symbol: str, depth: int = 50):
         # TODO: Validate the symbol exists
         market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
 
@@ -474,7 +475,6 @@ class MangoClient():
         ]
 
         return remaining_accounts
-
 
     def make_serum3_place_order_ix(self, symbol: str, side: Literal['bids', 'asks'], price: float, size: float):
         serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
@@ -1014,3 +1014,35 @@ class MangoClient():
             funding = 0
 
         return funding / 24 / 10 ** QUOTE_DECIMALS
+
+    async def fills(self, symbol: str):
+        # TODO: Validate that the symbol entered is valid
+
+        market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
+
+        match market_type:
+            case 'spot':
+                pass
+            case 'perpetual':
+                perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
+
+                perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
+
+                event_queue = await EventQueue.fetch(self.provider.connection, perp_market.event_queue)
+
+                fills = sorted(
+                    [FillEvent.layout.parse(bytes([event.event_type] + event.padding)) for event in event_queue.buf if event.event_type == 0],
+                    key=lambda fill: fill.seq_num
+                )
+
+                return [
+                    {
+                        'taker': str(fill.taker),
+                        'maker': str(fill.maker),
+                        'side': 'bids' if fill.taker_side else 'asks',
+                        'price': perp_market.price_lots_to_ui(fill.price),
+                        'size': perp_market.base_lots_to_ui(fill.quantity),
+                        'timestamp': fill.timestamp
+                    }
+                    for fill in fills
+                ]
