@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import json
 import pathlib
+from solana.publickey import PublicKey
 
 from mango_explorer_v4.mango_client import MangoClient
 
@@ -30,8 +31,9 @@ async def main():
         mango_account_pk=config['mango_account_pk']
     )
 
-    async for fill in mango_client.incremental_fills(args.symbol):
-        print(fill)
+    async for message in mango_client.incremental_fills(args.symbol):
+        for fill in message['fills']:
+            print(fill)
 
 
 if __name__ == '__main__':

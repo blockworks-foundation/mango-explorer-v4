@@ -1055,6 +1055,7 @@ class MangoClient():
                 }
 
     async def incremental_fills(self, symbol: str):
+        # TODO: Validate the symbol exists
         market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
 
         match market_type:
@@ -1078,7 +1079,15 @@ class MangoClient():
                             event_queue = EventQueue.layout.parse(submessage.result.value.data)
 
                             fills = sorted(
-                                [FillEvent.layout.parse(bytes([event.event_type] + event.padding)) for event in event_queue.buf if event.event_type == 0],
+                                [
+                                    fill
+                                    for fill in [
+                                        FillEvent.layout.parse(bytes([event.event_type] + event.padding))
+                                        for event in event_queue.buf
+                                        if event.event_type == 0
+                                    ]
+                                    if fill.taker != PublicKey(0)
+                                ],
                                 key=lambda fill: fill.seq_num
                             )
 
@@ -1089,8 +1098,8 @@ class MangoClient():
                                     'fills': [
                                         {
                                             'seq_num': fill.seq_num,
-                                            'taker': str(fill.taker),
-                                            'maker': str(fill.maker),
+                                            'taker': fill.taker,
+                                            'maker': fill.maker,
                                             'side': 'bids' if fill.taker_side else 'asks',
                                             'price': perp_market.price_lots_to_ui(fill.price),
                                             'size': perp_market.base_lots_to_ui(fill.quantity),
