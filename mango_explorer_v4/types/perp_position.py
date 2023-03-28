@@ -28,7 +28,10 @@ class PerpPositionJSON(typing.TypedDict):
     taker_volume: int
     perp_spot_transfers: int
     avg_entry_price_per_base_lot: float
-    realized_pnl_native: i80f48.I80F48JSON
+    realized_trade_pnl_native: i80f48.I80F48JSON
+    realized_other_pnl_native: i80f48.I80F48JSON
+    settle_pnl_limit_realized_trade: int
+    realized_pnl_for_position_native: i80f48.I80F48JSON
     reserved: list[int]
 
 
@@ -54,8 +57,11 @@ class PerpPosition:
         "taker_volume" / borsh.U64,
         "perp_spot_transfers" / borsh.I64,
         "avg_entry_price_per_base_lot" / borsh.F64,
-        "realized_pnl_native" / i80f48.I80F48.layout,
-        "reserved" / borsh.U8[128],
+        "realized_trade_pnl_native" / i80f48.I80F48.layout,
+        "realized_other_pnl_native" / i80f48.I80F48.layout,
+        "settle_pnl_limit_realized_trade" / borsh.I64,
+        "realized_pnl_for_position_native" / i80f48.I80F48.layout,
+        "reserved" / borsh.U8[88],
     )
     market_index: int
     padding: list[int]
@@ -76,7 +82,10 @@ class PerpPosition:
     taker_volume: int
     perp_spot_transfers: int
     avg_entry_price_per_base_lot: float
-    realized_pnl_native: i80f48.I80F48
+    realized_trade_pnl_native: i80f48.I80F48
+    realized_other_pnl_native: i80f48.I80F48
+    settle_pnl_limit_realized_trade: int
+    realized_pnl_for_position_native: i80f48.I80F48
     reserved: list[int]
 
     @classmethod
@@ -101,7 +110,16 @@ class PerpPosition:
             taker_volume=obj.taker_volume,
             perp_spot_transfers=obj.perp_spot_transfers,
             avg_entry_price_per_base_lot=obj.avg_entry_price_per_base_lot,
-            realized_pnl_native=i80f48.I80F48.from_decoded(obj.realized_pnl_native),
+            realized_trade_pnl_native=i80f48.I80F48.from_decoded(
+                obj.realized_trade_pnl_native
+            ),
+            realized_other_pnl_native=i80f48.I80F48.from_decoded(
+                obj.realized_other_pnl_native
+            ),
+            settle_pnl_limit_realized_trade=obj.settle_pnl_limit_realized_trade,
+            realized_pnl_for_position_native=i80f48.I80F48.from_decoded(
+                obj.realized_pnl_for_position_native
+            ),
             reserved=obj.reserved,
         )
 
@@ -126,7 +144,10 @@ class PerpPosition:
             "taker_volume": self.taker_volume,
             "perp_spot_transfers": self.perp_spot_transfers,
             "avg_entry_price_per_base_lot": self.avg_entry_price_per_base_lot,
-            "realized_pnl_native": self.realized_pnl_native.to_encodable(),
+            "realized_trade_pnl_native": self.realized_trade_pnl_native.to_encodable(),
+            "realized_other_pnl_native": self.realized_other_pnl_native.to_encodable(),
+            "settle_pnl_limit_realized_trade": self.settle_pnl_limit_realized_trade,
+            "realized_pnl_for_position_native": self.realized_pnl_for_position_native.to_encodable(),
             "reserved": self.reserved,
         }
 
@@ -151,7 +172,10 @@ class PerpPosition:
             "taker_volume": self.taker_volume,
             "perp_spot_transfers": self.perp_spot_transfers,
             "avg_entry_price_per_base_lot": self.avg_entry_price_per_base_lot,
-            "realized_pnl_native": self.realized_pnl_native.to_json(),
+            "realized_trade_pnl_native": self.realized_trade_pnl_native.to_json(),
+            "realized_other_pnl_native": self.realized_other_pnl_native.to_json(),
+            "settle_pnl_limit_realized_trade": self.settle_pnl_limit_realized_trade,
+            "realized_pnl_for_position_native": self.realized_pnl_for_position_native.to_json(),
             "reserved": self.reserved,
         }
 
@@ -179,6 +203,15 @@ class PerpPosition:
             taker_volume=obj["taker_volume"],
             perp_spot_transfers=obj["perp_spot_transfers"],
             avg_entry_price_per_base_lot=obj["avg_entry_price_per_base_lot"],
-            realized_pnl_native=i80f48.I80F48.from_json(obj["realized_pnl_native"]),
+            realized_trade_pnl_native=i80f48.I80F48.from_json(
+                obj["realized_trade_pnl_native"]
+            ),
+            realized_other_pnl_native=i80f48.I80F48.from_json(
+                obj["realized_other_pnl_native"]
+            ),
+            settle_pnl_limit_realized_trade=obj["settle_pnl_limit_realized_trade"],
+            realized_pnl_for_position_native=i80f48.I80F48.from_json(
+                obj["realized_pnl_for_position_native"]
+            ),
             reserved=obj["reserved"],
         )

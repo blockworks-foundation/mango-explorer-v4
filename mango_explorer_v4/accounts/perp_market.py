@@ -8,17 +8,15 @@ from anchorpy.coder.accounts import ACCOUNT_DISCRIMINATOR_SIZE
 from anchorpy.error import AccountInvalidDiscriminator
 from anchorpy.utils.rpc import get_multiple_accounts
 from anchorpy.borsh_extension import BorshPubkey
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 from .. import types
-from ..constants import QUOTE_DECIMALS
-from decimal import Decimal
 
 
 class PerpMarketJSON(typing.TypedDict):
     group: str
     settle_token_index: int
     perp_market_index: int
-    trusted_market: int
+    blocked1: int
     group_insurance_fund: int
     bump: int
     base_decimals: int
@@ -31,10 +29,10 @@ class PerpMarketJSON(typing.TypedDict):
     stable_price_model: types.stable_price_model.StablePriceModelJSON
     quote_lot_size: int
     base_lot_size: int
-    maint_asset_weight: types.i80f48.I80F48JSON
-    init_asset_weight: types.i80f48.I80F48JSON
-    maint_liab_weight: types.i80f48.I80F48JSON
-    init_liab_weight: types.i80f48.I80F48JSON
+    maint_base_asset_weight: types.i80f48.I80F48JSON
+    init_base_asset_weight: types.i80f48.I80F48JSON
+    maint_base_liab_weight: types.i80f48.I80F48JSON
+    init_base_liab_weight: types.i80f48.I80F48JSON
     open_interest: int
     seq_num: int
     registration_time: int
@@ -44,7 +42,7 @@ class PerpMarketJSON(typing.TypedDict):
     long_funding: types.i80f48.I80F48JSON
     short_funding: types.i80f48.I80F48JSON
     funding_last_updated: int
-    liquidation_fee: types.i80f48.I80F48JSON
+    base_liquidation_fee: types.i80f48.I80F48JSON
     maker_fee: types.i80f48.I80F48JSON
     taker_fee: types.i80f48.I80F48JSON
     fees_accrued: types.i80f48.I80F48JSON
@@ -56,6 +54,11 @@ class PerpMarketJSON(typing.TypedDict):
     settle_pnl_limit_factor: float
     padding3: list[int]
     settle_pnl_limit_window_size_ts: int
+    reduce_only: int
+    padding4: list[int]
+    maint_overall_asset_weight: types.i80f48.I80F48JSON
+    init_overall_asset_weight: types.i80f48.I80F48JSON
+    positive_pnl_liquidation_fee: types.i80f48.I80F48JSON
     reserved: list[int]
 
 
@@ -66,7 +69,7 @@ class PerpMarket:
         "group" / BorshPubkey,
         "settle_token_index" / borsh.U16,
         "perp_market_index" / borsh.U16,
-        "trusted_market" / borsh.U8,
+        "blocked1" / borsh.U8,
         "group_insurance_fund" / borsh.U8,
         "bump" / borsh.U8,
         "base_decimals" / borsh.U8,
@@ -79,10 +82,10 @@ class PerpMarket:
         "stable_price_model" / types.stable_price_model.StablePriceModel.layout,
         "quote_lot_size" / borsh.I64,
         "base_lot_size" / borsh.I64,
-        "maint_asset_weight" / types.i80f48.I80F48.layout,
-        "init_asset_weight" / types.i80f48.I80F48.layout,
-        "maint_liab_weight" / types.i80f48.I80F48.layout,
-        "init_liab_weight" / types.i80f48.I80F48.layout,
+        "maint_base_asset_weight" / types.i80f48.I80F48.layout,
+        "init_base_asset_weight" / types.i80f48.I80F48.layout,
+        "maint_base_liab_weight" / types.i80f48.I80F48.layout,
+        "init_base_liab_weight" / types.i80f48.I80F48.layout,
         "open_interest" / borsh.I64,
         "seq_num" / borsh.U64,
         "registration_time" / borsh.U64,
@@ -92,7 +95,7 @@ class PerpMarket:
         "long_funding" / types.i80f48.I80F48.layout,
         "short_funding" / types.i80f48.I80F48.layout,
         "funding_last_updated" / borsh.U64,
-        "liquidation_fee" / types.i80f48.I80F48.layout,
+        "base_liquidation_fee" / types.i80f48.I80F48.layout,
         "maker_fee" / types.i80f48.I80F48.layout,
         "taker_fee" / types.i80f48.I80F48.layout,
         "fees_accrued" / types.i80f48.I80F48.layout,
@@ -104,12 +107,17 @@ class PerpMarket:
         "settle_pnl_limit_factor" / borsh.F32,
         "padding3" / borsh.U8[4],
         "settle_pnl_limit_window_size_ts" / borsh.U64,
-        "reserved" / borsh.U8[1944],
+        "reduce_only" / borsh.U8,
+        "padding4" / borsh.U8[7],
+        "maint_overall_asset_weight" / types.i80f48.I80F48.layout,
+        "init_overall_asset_weight" / types.i80f48.I80F48.layout,
+        "positive_pnl_liquidation_fee" / types.i80f48.I80F48.layout,
+        "reserved" / borsh.U8[1888],
     )
     group: PublicKey
     settle_token_index: int
     perp_market_index: int
-    trusted_market: int
+    blocked1: int
     group_insurance_fund: int
     bump: int
     base_decimals: int
@@ -122,10 +130,10 @@ class PerpMarket:
     stable_price_model: types.stable_price_model.StablePriceModel
     quote_lot_size: int
     base_lot_size: int
-    maint_asset_weight: types.i80f48.I80F48
-    init_asset_weight: types.i80f48.I80F48
-    maint_liab_weight: types.i80f48.I80F48
-    init_liab_weight: types.i80f48.I80F48
+    maint_base_asset_weight: types.i80f48.I80F48
+    init_base_asset_weight: types.i80f48.I80F48
+    maint_base_liab_weight: types.i80f48.I80F48
+    init_base_liab_weight: types.i80f48.I80F48
     open_interest: int
     seq_num: int
     registration_time: int
@@ -135,7 +143,7 @@ class PerpMarket:
     long_funding: types.i80f48.I80F48
     short_funding: types.i80f48.I80F48
     funding_last_updated: int
-    liquidation_fee: types.i80f48.I80F48
+    base_liquidation_fee: types.i80f48.I80F48
     maker_fee: types.i80f48.I80F48
     taker_fee: types.i80f48.I80F48
     fees_accrued: types.i80f48.I80F48
@@ -147,14 +155,20 @@ class PerpMarket:
     settle_pnl_limit_factor: float
     padding3: list[int]
     settle_pnl_limit_window_size_ts: int
+    reduce_only: int
+    padding4: list[int]
+    maint_overall_asset_weight: types.i80f48.I80F48
+    init_overall_asset_weight: types.i80f48.I80F48
+    positive_pnl_liquidation_fee: types.i80f48.I80F48
     reserved: list[int]
 
+    @classmethod
     async def fetch(
         cls,
         conn: AsyncClient,
         address: PublicKey,
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.Optional["PerpMarket"]:
         resp = await conn.get_account_info(address, commitment=commitment)
         info = resp.value
@@ -171,7 +185,7 @@ class PerpMarket:
         conn: AsyncClient,
         addresses: list[PublicKey],
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.List[typing.Optional["PerpMarket"]]:
         infos = await get_multiple_accounts(conn, addresses, commitment=commitment)
         res: typing.List[typing.Optional["PerpMarket"]] = []
@@ -195,7 +209,7 @@ class PerpMarket:
             group=dec.group,
             settle_token_index=dec.settle_token_index,
             perp_market_index=dec.perp_market_index,
-            trusted_market=dec.trusted_market,
+            blocked1=dec.blocked1,
             group_insurance_fund=dec.group_insurance_fund,
             bump=dec.bump,
             base_decimals=dec.base_decimals,
@@ -212,10 +226,18 @@ class PerpMarket:
             ),
             quote_lot_size=dec.quote_lot_size,
             base_lot_size=dec.base_lot_size,
-            maint_asset_weight=types.i80f48.I80F48.from_decoded(dec.maint_asset_weight),
-            init_asset_weight=types.i80f48.I80F48.from_decoded(dec.init_asset_weight),
-            maint_liab_weight=types.i80f48.I80F48.from_decoded(dec.maint_liab_weight),
-            init_liab_weight=types.i80f48.I80F48.from_decoded(dec.init_liab_weight),
+            maint_base_asset_weight=types.i80f48.I80F48.from_decoded(
+                dec.maint_base_asset_weight
+            ),
+            init_base_asset_weight=types.i80f48.I80F48.from_decoded(
+                dec.init_base_asset_weight
+            ),
+            maint_base_liab_weight=types.i80f48.I80F48.from_decoded(
+                dec.maint_base_liab_weight
+            ),
+            init_base_liab_weight=types.i80f48.I80F48.from_decoded(
+                dec.init_base_liab_weight
+            ),
             open_interest=dec.open_interest,
             seq_num=dec.seq_num,
             registration_time=dec.registration_time,
@@ -225,7 +247,9 @@ class PerpMarket:
             long_funding=types.i80f48.I80F48.from_decoded(dec.long_funding),
             short_funding=types.i80f48.I80F48.from_decoded(dec.short_funding),
             funding_last_updated=dec.funding_last_updated,
-            liquidation_fee=types.i80f48.I80F48.from_decoded(dec.liquidation_fee),
+            base_liquidation_fee=types.i80f48.I80F48.from_decoded(
+                dec.base_liquidation_fee
+            ),
             maker_fee=types.i80f48.I80F48.from_decoded(dec.maker_fee),
             taker_fee=types.i80f48.I80F48.from_decoded(dec.taker_fee),
             fees_accrued=types.i80f48.I80F48.from_decoded(dec.fees_accrued),
@@ -237,6 +261,17 @@ class PerpMarket:
             settle_pnl_limit_factor=dec.settle_pnl_limit_factor,
             padding3=dec.padding3,
             settle_pnl_limit_window_size_ts=dec.settle_pnl_limit_window_size_ts,
+            reduce_only=dec.reduce_only,
+            padding4=dec.padding4,
+            maint_overall_asset_weight=types.i80f48.I80F48.from_decoded(
+                dec.maint_overall_asset_weight
+            ),
+            init_overall_asset_weight=types.i80f48.I80F48.from_decoded(
+                dec.init_overall_asset_weight
+            ),
+            positive_pnl_liquidation_fee=types.i80f48.I80F48.from_decoded(
+                dec.positive_pnl_liquidation_fee
+            ),
             reserved=dec.reserved,
         )
 
@@ -245,7 +280,7 @@ class PerpMarket:
             "group": str(self.group),
             "settle_token_index": self.settle_token_index,
             "perp_market_index": self.perp_market_index,
-            "trusted_market": self.trusted_market,
+            "blocked1": self.blocked1,
             "group_insurance_fund": self.group_insurance_fund,
             "bump": self.bump,
             "base_decimals": self.base_decimals,
@@ -258,10 +293,10 @@ class PerpMarket:
             "stable_price_model": self.stable_price_model.to_json(),
             "quote_lot_size": self.quote_lot_size,
             "base_lot_size": self.base_lot_size,
-            "maint_asset_weight": self.maint_asset_weight.to_json(),
-            "init_asset_weight": self.init_asset_weight.to_json(),
-            "maint_liab_weight": self.maint_liab_weight.to_json(),
-            "init_liab_weight": self.init_liab_weight.to_json(),
+            "maint_base_asset_weight": self.maint_base_asset_weight.to_json(),
+            "init_base_asset_weight": self.init_base_asset_weight.to_json(),
+            "maint_base_liab_weight": self.maint_base_liab_weight.to_json(),
+            "init_base_liab_weight": self.init_base_liab_weight.to_json(),
             "open_interest": self.open_interest,
             "seq_num": self.seq_num,
             "registration_time": self.registration_time,
@@ -271,7 +306,7 @@ class PerpMarket:
             "long_funding": self.long_funding.to_json(),
             "short_funding": self.short_funding.to_json(),
             "funding_last_updated": self.funding_last_updated,
-            "liquidation_fee": self.liquidation_fee.to_json(),
+            "base_liquidation_fee": self.base_liquidation_fee.to_json(),
             "maker_fee": self.maker_fee.to_json(),
             "taker_fee": self.taker_fee.to_json(),
             "fees_accrued": self.fees_accrued.to_json(),
@@ -283,6 +318,11 @@ class PerpMarket:
             "settle_pnl_limit_factor": self.settle_pnl_limit_factor,
             "padding3": self.padding3,
             "settle_pnl_limit_window_size_ts": self.settle_pnl_limit_window_size_ts,
+            "reduce_only": self.reduce_only,
+            "padding4": self.padding4,
+            "maint_overall_asset_weight": self.maint_overall_asset_weight.to_json(),
+            "init_overall_asset_weight": self.init_overall_asset_weight.to_json(),
+            "positive_pnl_liquidation_fee": self.positive_pnl_liquidation_fee.to_json(),
             "reserved": self.reserved,
         }
 
@@ -292,7 +332,7 @@ class PerpMarket:
             group=PublicKey(obj["group"]),
             settle_token_index=obj["settle_token_index"],
             perp_market_index=obj["perp_market_index"],
-            trusted_market=obj["trusted_market"],
+            blocked1=obj["blocked1"],
             group_insurance_fund=obj["group_insurance_fund"],
             bump=obj["bump"],
             base_decimals=obj["base_decimals"],
@@ -309,10 +349,18 @@ class PerpMarket:
             ),
             quote_lot_size=obj["quote_lot_size"],
             base_lot_size=obj["base_lot_size"],
-            maint_asset_weight=types.i80f48.I80F48.from_json(obj["maint_asset_weight"]),
-            init_asset_weight=types.i80f48.I80F48.from_json(obj["init_asset_weight"]),
-            maint_liab_weight=types.i80f48.I80F48.from_json(obj["maint_liab_weight"]),
-            init_liab_weight=types.i80f48.I80F48.from_json(obj["init_liab_weight"]),
+            maint_base_asset_weight=types.i80f48.I80F48.from_json(
+                obj["maint_base_asset_weight"]
+            ),
+            init_base_asset_weight=types.i80f48.I80F48.from_json(
+                obj["init_base_asset_weight"]
+            ),
+            maint_base_liab_weight=types.i80f48.I80F48.from_json(
+                obj["maint_base_liab_weight"]
+            ),
+            init_base_liab_weight=types.i80f48.I80F48.from_json(
+                obj["init_base_liab_weight"]
+            ),
             open_interest=obj["open_interest"],
             seq_num=obj["seq_num"],
             registration_time=obj["registration_time"],
@@ -322,7 +370,9 @@ class PerpMarket:
             long_funding=types.i80f48.I80F48.from_json(obj["long_funding"]),
             short_funding=types.i80f48.I80F48.from_json(obj["short_funding"]),
             funding_last_updated=obj["funding_last_updated"],
-            liquidation_fee=types.i80f48.I80F48.from_json(obj["liquidation_fee"]),
+            base_liquidation_fee=types.i80f48.I80F48.from_json(
+                obj["base_liquidation_fee"]
+            ),
             maker_fee=types.i80f48.I80F48.from_json(obj["maker_fee"]),
             taker_fee=types.i80f48.I80F48.from_json(obj["taker_fee"]),
             fees_accrued=types.i80f48.I80F48.from_json(obj["fees_accrued"]),
@@ -334,30 +384,16 @@ class PerpMarket:
             settle_pnl_limit_factor=obj["settle_pnl_limit_factor"],
             padding3=obj["padding3"],
             settle_pnl_limit_window_size_ts=obj["settle_pnl_limit_window_size_ts"],
+            reduce_only=obj["reduce_only"],
+            padding4=obj["padding4"],
+            maint_overall_asset_weight=types.i80f48.I80F48.from_json(
+                obj["maint_overall_asset_weight"]
+            ),
+            init_overall_asset_weight=types.i80f48.I80F48.from_json(
+                obj["init_overall_asset_weight"]
+            ),
+            positive_pnl_liquidation_fee=types.i80f48.I80F48.from_json(
+                obj["positive_pnl_liquidation_fee"]
+            ),
             reserved=obj["reserved"],
         )
-
-    # TODO: Transform all convertors into functions
-    def __post_init__(self):
-        self.price_lots_to_ui_converter = (((Decimal(10) ** Decimal(self.base_decimals - QUOTE_DECIMALS)) * Decimal(self.quote_lot_size)) / Decimal(self.base_lot_size))
-        self.base_lots_to_ui_converter = (Decimal(self.base_lot_size) / Decimal(10) ** Decimal(self.base_decimals))
-        self.quote_lots_to_ui_converter = (Decimal(self.quote_lot_size) / (Decimal(10) ** Decimal(QUOTE_DECIMALS)))
-
-    def price_lots_to_ui(self, price_lots: int):
-        return float(Decimal(price_lots) * Decimal(self.price_lots_to_ui_converter))
-
-    def base_lots_to_ui(self, base_lots: int):
-        return float(Decimal(base_lots) * (Decimal(self.base_lot_size) / Decimal(10) ** Decimal(self.base_decimals)))
-
-    def quote_lots_to_ui(self, quote_lots: int):
-        raise NotImplementedError
-
-    def ui_price_to_lots(self, ui_price: float) -> int:
-        return int(Decimal(ui_price * 10 ** QUOTE_DECIMALS) * Decimal(self.base_lot_size) / Decimal(self.quote_lot_size * 10 ** self.base_decimals))
-
-    def ui_base_to_lots(self, ui_base: float) -> int:
-        return int(Decimal(ui_base * 10 ** self.base_decimals) / Decimal(self.base_lot_size))
-
-    def ui_quote_to_lots(self, ui_quote: float) -> int:
-        return int(Decimal(ui_quote * 10 ** QUOTE_DECIMALS) / Decimal(self.quote_lot_size))
-

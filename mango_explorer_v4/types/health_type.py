@@ -13,6 +13,10 @@ class MaintJSON(typing.TypedDict):
     kind: typing.Literal["Maint"]
 
 
+class LiquidationEndJSON(typing.TypedDict):
+    kind: typing.Literal["LiquidationEnd"]
+
+
 @dataclass
 class Init:
     discriminator: typing.ClassVar = 0
@@ -49,8 +53,26 @@ class Maint:
         }
 
 
-HealthTypeKind = typing.Union[Init, Maint]
-HealthTypeJSON = typing.Union[InitJSON, MaintJSON]
+@dataclass
+class LiquidationEnd:
+    discriminator: typing.ClassVar = 2
+    kind: typing.ClassVar = "LiquidationEnd"
+
+    @classmethod
+    def to_json(cls) -> LiquidationEndJSON:
+        return LiquidationEndJSON(
+            kind="LiquidationEnd",
+        )
+
+    @classmethod
+    def to_encodable(cls) -> dict:
+        return {
+            "LiquidationEnd": {},
+        }
+
+
+HealthTypeKind = typing.Union[Init, Maint, LiquidationEnd]
+HealthTypeJSON = typing.Union[InitJSON, MaintJSON, LiquidationEndJSON]
 
 
 def from_decoded(obj: dict) -> HealthTypeKind:
@@ -60,6 +82,8 @@ def from_decoded(obj: dict) -> HealthTypeKind:
         return Init()
     if "Maint" in obj:
         return Maint()
+    if "LiquidationEnd" in obj:
+        return LiquidationEnd()
     raise ValueError("Invalid enum object")
 
 
@@ -68,8 +92,14 @@ def from_json(obj: HealthTypeJSON) -> HealthTypeKind:
         return Init()
     if obj["kind"] == "Maint":
         return Maint()
+    if obj["kind"] == "LiquidationEnd":
+        return LiquidationEnd()
     kind = obj["kind"]
     raise ValueError(f"Unrecognized enum kind: {kind}")
 
 
-layout = EnumForCodegen("Init" / borsh.CStruct(), "Maint" / borsh.CStruct())
+layout = EnumForCodegen(
+    "Init" / borsh.CStruct(),
+    "Maint" / borsh.CStruct(),
+    "LiquidationEnd" / borsh.CStruct(),
+)

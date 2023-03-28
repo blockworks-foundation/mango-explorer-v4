@@ -5,7 +5,7 @@ from spl.token.constants import TOKEN_PROGRAM_ID
 from solana.transaction import TransactionInstruction, AccountMeta
 import borsh_construct as borsh
 from .. import types
-from ..program_id import MANGO_PROGRAM_ID, SERUM_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class Serum3PlaceOrderArgs(typing.TypedDict):
@@ -54,7 +54,7 @@ class Serum3PlaceOrderAccounts(typing.TypedDict):
 def serum3_place_order(
     args: Serum3PlaceOrderArgs,
     accounts: Serum3PlaceOrderAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [

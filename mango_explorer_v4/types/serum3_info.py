@@ -14,6 +14,7 @@ class Serum3InfoJSON(typing.TypedDict):
     base_index: int
     quote_index: int
     market_index: int
+    has_zero_funds: bool
 
 
 @dataclass
@@ -24,12 +25,14 @@ class Serum3Info:
         "base_index" / borsh.U64,
         "quote_index" / borsh.U64,
         "market_index" / borsh.U16,
+        "has_zero_funds" / borsh.Bool,
     )
     reserved_base: i80f48.I80F48
     reserved_quote: i80f48.I80F48
     base_index: int
     quote_index: int
     market_index: int
+    has_zero_funds: bool
 
     @classmethod
     def from_decoded(cls, obj: Container) -> "Serum3Info":
@@ -39,6 +42,7 @@ class Serum3Info:
             base_index=obj.base_index,
             quote_index=obj.quote_index,
             market_index=obj.market_index,
+            has_zero_funds=obj.has_zero_funds,
         )
 
     def to_encodable(self) -> dict[str, typing.Any]:
@@ -48,6 +52,7 @@ class Serum3Info:
             "base_index": self.base_index,
             "quote_index": self.quote_index,
             "market_index": self.market_index,
+            "has_zero_funds": self.has_zero_funds,
         }
 
     def to_json(self) -> Serum3InfoJSON:
@@ -57,6 +62,7 @@ class Serum3Info:
             "base_index": self.base_index,
             "quote_index": self.quote_index,
             "market_index": self.market_index,
+            "has_zero_funds": self.has_zero_funds,
         }
 
     @classmethod
@@ -67,4 +73,5 @@ class Serum3Info:
             base_index=obj["base_index"],
             quote_index=obj["quote_index"],
             market_index=obj["market_index"],
+            has_zero_funds=obj["has_zero_funds"],
         )

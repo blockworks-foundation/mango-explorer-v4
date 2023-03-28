@@ -3,7 +3,7 @@ import typing
 from solana.publickey import PublicKey
 from spl.token.constants import TOKEN_PROGRAM_ID
 from solana.transaction import TransactionInstruction, AccountMeta
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class Serum3DeregisterMarketAccounts(typing.TypedDict):
@@ -16,7 +16,7 @@ class Serum3DeregisterMarketAccounts(typing.TypedDict):
 
 def serum3_deregister_market(
     accounts: Serum3DeregisterMarketAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [

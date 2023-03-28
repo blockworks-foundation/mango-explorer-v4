@@ -4,14 +4,15 @@ from solana.publickey import PublicKey
 from spl.token.constants import TOKEN_PROGRAM_ID
 from solana.transaction import TransactionInstruction, AccountMeta
 import borsh_construct as borsh
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class TokenDepositIntoExistingArgs(typing.TypedDict):
     amount: int
+    reduce_only: bool
 
 
-layout = borsh.CStruct("amount" / borsh.U64)
+layout = borsh.CStruct("amount" / borsh.U64, "reduce_only" / borsh.Bool)
 
 
 class TokenDepositIntoExistingAccounts(typing.TypedDict):
@@ -27,7 +28,7 @@ class TokenDepositIntoExistingAccounts(typing.TypedDict):
 def token_deposit_into_existing(
     args: TokenDepositIntoExistingArgs,
     accounts: TokenDepositIntoExistingAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [
@@ -50,6 +51,7 @@ def token_deposit_into_existing(
     encoded_args = layout.build(
         {
             "amount": args["amount"],
+            "reduce_only": args["reduce_only"],
         }
     )
     data = identifier + encoded_args

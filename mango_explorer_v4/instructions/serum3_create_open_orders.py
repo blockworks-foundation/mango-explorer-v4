@@ -4,7 +4,7 @@ from solana.publickey import PublicKey
 from solana.system_program import SYS_PROGRAM_ID
 from solana.sysvar import SYSVAR_RENT_PUBKEY
 from solana.transaction import TransactionInstruction, AccountMeta
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class Serum3CreateOpenOrdersAccounts(typing.TypedDict):
@@ -20,7 +20,7 @@ class Serum3CreateOpenOrdersAccounts(typing.TypedDict):
 
 def serum3_create_open_orders(
     accounts: Serum3CreateOpenOrdersAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [

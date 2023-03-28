@@ -9,7 +9,7 @@ from anchorpy.coder.accounts import ACCOUNT_DISCRIMINATOR_SIZE
 from anchorpy.error import AccountInvalidDiscriminator
 from anchorpy.utils.rpc import get_multiple_accounts
 from anchorpy.borsh_extension import BorshPubkey
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 from .. import types
 
 
@@ -26,6 +26,10 @@ class MangoAccountJSON(typing.TypedDict):
     net_deposits: int
     perp_spot_transfers: int
     health_region_begin_init_health: int
+    frozen_until: int
+    buyback_fees_accrued_current: int
+    buyback_fees_accrued_previous: int
+    buyback_fees_expiry_timestamp: int
     reserved: list[int]
     header_version: int
     padding3: list[int]
@@ -55,7 +59,11 @@ class MangoAccount:
         "net_deposits" / borsh.I64,
         "perp_spot_transfers" / borsh.I64,
         "health_region_begin_init_health" / borsh.I64,
-        "reserved" / borsh.U8[240],
+        "frozen_until" / borsh.U64,
+        "buyback_fees_accrued_current" / borsh.U64,
+        "buyback_fees_accrued_previous" / borsh.U64,
+        "buyback_fees_expiry_timestamp" / borsh.U64,
+        "reserved" / borsh.U8[208],
         "header_version" / borsh.U8,
         "padding3" / borsh.U8[7],
         "padding4" / borsh.U32,
@@ -83,6 +91,10 @@ class MangoAccount:
     net_deposits: int
     perp_spot_transfers: int
     health_region_begin_init_health: int
+    frozen_until: int
+    buyback_fees_accrued_current: int
+    buyback_fees_accrued_previous: int
+    buyback_fees_expiry_timestamp: int
     reserved: list[int]
     header_version: int
     padding3: list[int]
@@ -101,7 +113,7 @@ class MangoAccount:
         conn: AsyncClient,
         address: PublicKey,
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.Optional["MangoAccount"]:
         resp = await conn.get_account_info(address, commitment=commitment)
         info = resp.value
@@ -118,7 +130,7 @@ class MangoAccount:
         conn: AsyncClient,
         addresses: list[PublicKey],
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.List[typing.Optional["MangoAccount"]]:
         infos = await get_multiple_accounts(conn, addresses, commitment=commitment)
         res: typing.List[typing.Optional["MangoAccount"]] = []
@@ -151,6 +163,10 @@ class MangoAccount:
             net_deposits=dec.net_deposits,
             perp_spot_transfers=dec.perp_spot_transfers,
             health_region_begin_init_health=dec.health_region_begin_init_health,
+            frozen_until=dec.frozen_until,
+            buyback_fees_accrued_current=dec.buyback_fees_accrued_current,
+            buyback_fees_accrued_previous=dec.buyback_fees_accrued_previous,
+            buyback_fees_expiry_timestamp=dec.buyback_fees_expiry_timestamp,
             reserved=dec.reserved,
             header_version=dec.header_version,
             padding3=dec.padding3,
@@ -198,6 +214,10 @@ class MangoAccount:
             "net_deposits": self.net_deposits,
             "perp_spot_transfers": self.perp_spot_transfers,
             "health_region_begin_init_health": self.health_region_begin_init_health,
+            "frozen_until": self.frozen_until,
+            "buyback_fees_accrued_current": self.buyback_fees_accrued_current,
+            "buyback_fees_accrued_previous": self.buyback_fees_accrued_previous,
+            "buyback_fees_expiry_timestamp": self.buyback_fees_expiry_timestamp,
             "reserved": self.reserved,
             "header_version": self.header_version,
             "padding3": self.padding3,
@@ -228,6 +248,10 @@ class MangoAccount:
             net_deposits=obj["net_deposits"],
             perp_spot_transfers=obj["perp_spot_transfers"],
             health_region_begin_init_health=obj["health_region_begin_init_health"],
+            frozen_until=obj["frozen_until"],
+            buyback_fees_accrued_current=obj["buyback_fees_accrued_current"],
+            buyback_fees_accrued_previous=obj["buyback_fees_accrued_previous"],
+            buyback_fees_expiry_timestamp=obj["buyback_fees_expiry_timestamp"],
             reserved=obj["reserved"],
             header_version=obj["header_version"],
             padding3=obj["padding3"],

@@ -19,6 +19,7 @@ class LeafNodeJSON(typing.TypedDict):
     quantity: int
     timestamp: int
     peg_limit: int
+    client_order_id: int
     reserved: list[int]
 
 
@@ -36,7 +37,8 @@ class LeafNode:
         "quantity" / borsh.I64,
         "timestamp" / borsh.U64,
         "peg_limit" / borsh.I64,
-        "reserved" / borsh.U8[40],
+        "client_order_id" / borsh.U64,
+        "reserved" / borsh.U8[32],
     )
     tag: int
     owner_slot: int
@@ -49,6 +51,7 @@ class LeafNode:
     quantity: int
     timestamp: int
     peg_limit: int
+    client_order_id: int
     reserved: list[int]
 
     @classmethod
@@ -65,6 +68,7 @@ class LeafNode:
             quantity=obj.quantity,
             timestamp=obj.timestamp,
             peg_limit=obj.peg_limit,
+            client_order_id=obj.client_order_id,
             reserved=obj.reserved,
         )
 
@@ -81,6 +85,7 @@ class LeafNode:
             "quantity": self.quantity,
             "timestamp": self.timestamp,
             "peg_limit": self.peg_limit,
+            "client_order_id": self.client_order_id,
             "reserved": self.reserved,
         }
 
@@ -97,6 +102,7 @@ class LeafNode:
             "quantity": self.quantity,
             "timestamp": self.timestamp,
             "peg_limit": self.peg_limit,
+            "client_order_id": self.client_order_id,
             "reserved": self.reserved,
         }
 
@@ -114,5 +120,6 @@ class LeafNode:
             quantity=obj["quantity"],
             timestamp=obj["timestamp"],
             peg_limit=obj["peg_limit"],
+            client_order_id=obj["client_order_id"],
             reserved=obj["reserved"],
         )

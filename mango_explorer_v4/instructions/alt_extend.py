@@ -5,7 +5,7 @@ from solana.transaction import TransactionInstruction, AccountMeta
 from anchorpy.borsh_extension import BorshPubkey
 from construct import Construct
 import borsh_construct as borsh
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class AltExtendArgs(typing.TypedDict):
@@ -28,7 +28,7 @@ class AltExtendAccounts(typing.TypedDict):
 def alt_extend(
     args: AltExtendArgs,
     accounts: AltExtendAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [

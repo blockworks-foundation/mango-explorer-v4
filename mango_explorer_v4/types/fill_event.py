@@ -1,7 +1,4 @@
 from __future__ import annotations
-from . import (
-    i80f48,
-)
 import typing
 from dataclasses import dataclass
 from construct import Container
@@ -19,15 +16,17 @@ class FillEventJSON(typing.TypedDict):
     timestamp: int
     seq_num: int
     maker: str
-    maker_order_id: int
-    maker_fee: i80f48.I80F48JSON
+    padding2: list[int]
     maker_timestamp: int
     taker: str
-    taker_order_id: int
+    padding3: list[int]
     taker_client_order_id: int
-    taker_fee: i80f48.I80F48JSON
+    padding4: list[int]
     price: int
     quantity: int
+    maker_client_order_id: int
+    maker_fee: float
+    taker_fee: float
     reserved: list[int]
 
 
@@ -42,16 +41,18 @@ class FillEvent:
         "timestamp" / borsh.U64,
         "seq_num" / borsh.U64,
         "maker" / BorshPubkey,
-        "maker_order_id" / borsh.U128,
-        "maker_fee" / i80f48.I80F48.layout,
+        "padding2" / borsh.U8[32],
         "maker_timestamp" / borsh.U64,
         "taker" / BorshPubkey,
-        "taker_order_id" / borsh.U128,
+        "padding3" / borsh.U8[16],
         "taker_client_order_id" / borsh.U64,
-        "taker_fee" / i80f48.I80F48.layout,
+        "padding4" / borsh.U8[16],
         "price" / borsh.I64,
         "quantity" / borsh.I64,
-        "reserved" / borsh.U8[24],
+        "maker_client_order_id" / borsh.U64,
+        "maker_fee" / borsh.F32,
+        "taker_fee" / borsh.F32,
+        "reserved" / borsh.U8[8],
     )
     event_type: int
     taker_side: int
@@ -61,15 +62,17 @@ class FillEvent:
     timestamp: int
     seq_num: int
     maker: PublicKey
-    maker_order_id: int
-    maker_fee: i80f48.I80F48
+    padding2: list[int]
     maker_timestamp: int
     taker: PublicKey
-    taker_order_id: int
+    padding3: list[int]
     taker_client_order_id: int
-    taker_fee: i80f48.I80F48
+    padding4: list[int]
     price: int
     quantity: int
+    maker_client_order_id: int
+    maker_fee: float
+    taker_fee: float
     reserved: list[int]
 
     @classmethod
@@ -83,15 +86,17 @@ class FillEvent:
             timestamp=obj.timestamp,
             seq_num=obj.seq_num,
             maker=obj.maker,
-            maker_order_id=obj.maker_order_id,
-            maker_fee=i80f48.I80F48.from_decoded(obj.maker_fee),
+            padding2=obj.padding2,
             maker_timestamp=obj.maker_timestamp,
             taker=obj.taker,
-            taker_order_id=obj.taker_order_id,
+            padding3=obj.padding3,
             taker_client_order_id=obj.taker_client_order_id,
-            taker_fee=i80f48.I80F48.from_decoded(obj.taker_fee),
+            padding4=obj.padding4,
             price=obj.price,
             quantity=obj.quantity,
+            maker_client_order_id=obj.maker_client_order_id,
+            maker_fee=obj.maker_fee,
+            taker_fee=obj.taker_fee,
             reserved=obj.reserved,
         )
 
@@ -105,15 +110,17 @@ class FillEvent:
             "timestamp": self.timestamp,
             "seq_num": self.seq_num,
             "maker": self.maker,
-            "maker_order_id": self.maker_order_id,
-            "maker_fee": self.maker_fee.to_encodable(),
+            "padding2": self.padding2,
             "maker_timestamp": self.maker_timestamp,
             "taker": self.taker,
-            "taker_order_id": self.taker_order_id,
+            "padding3": self.padding3,
             "taker_client_order_id": self.taker_client_order_id,
-            "taker_fee": self.taker_fee.to_encodable(),
+            "padding4": self.padding4,
             "price": self.price,
             "quantity": self.quantity,
+            "maker_client_order_id": self.maker_client_order_id,
+            "maker_fee": self.maker_fee,
+            "taker_fee": self.taker_fee,
             "reserved": self.reserved,
         }
 
@@ -127,15 +134,17 @@ class FillEvent:
             "timestamp": self.timestamp,
             "seq_num": self.seq_num,
             "maker": str(self.maker),
-            "maker_order_id": self.maker_order_id,
-            "maker_fee": self.maker_fee.to_json(),
+            "padding2": self.padding2,
             "maker_timestamp": self.maker_timestamp,
             "taker": str(self.taker),
-            "taker_order_id": self.taker_order_id,
+            "padding3": self.padding3,
             "taker_client_order_id": self.taker_client_order_id,
-            "taker_fee": self.taker_fee.to_json(),
+            "padding4": self.padding4,
             "price": self.price,
             "quantity": self.quantity,
+            "maker_client_order_id": self.maker_client_order_id,
+            "maker_fee": self.maker_fee,
+            "taker_fee": self.taker_fee,
             "reserved": self.reserved,
         }
 
@@ -150,14 +159,16 @@ class FillEvent:
             timestamp=obj["timestamp"],
             seq_num=obj["seq_num"],
             maker=PublicKey(obj["maker"]),
-            maker_order_id=obj["maker_order_id"],
-            maker_fee=i80f48.I80F48.from_json(obj["maker_fee"]),
+            padding2=obj["padding2"],
             maker_timestamp=obj["maker_timestamp"],
             taker=PublicKey(obj["taker"]),
-            taker_order_id=obj["taker_order_id"],
+            padding3=obj["padding3"],
             taker_client_order_id=obj["taker_client_order_id"],
-            taker_fee=i80f48.I80F48.from_json(obj["taker_fee"]),
+            padding4=obj["padding4"],
             price=obj["price"],
             quantity=obj["quantity"],
+            maker_client_order_id=obj["maker_client_order_id"],
+            maker_fee=obj["maker_fee"],
+            taker_fee=obj["taker_fee"],
             reserved=obj["reserved"],
         )

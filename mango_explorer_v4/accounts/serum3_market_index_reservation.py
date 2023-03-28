@@ -8,7 +8,7 @@ from anchorpy.coder.accounts import ACCOUNT_DISCRIMINATOR_SIZE
 from anchorpy.error import AccountInvalidDiscriminator
 from anchorpy.utils.rpc import get_multiple_accounts
 from anchorpy.borsh_extension import BorshPubkey
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class Serum3MarketIndexReservationJSON(typing.TypedDict):
@@ -33,7 +33,7 @@ class Serum3MarketIndexReservation:
         conn: AsyncClient,
         address: PublicKey,
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.Optional["Serum3MarketIndexReservation"]:
         resp = await conn.get_account_info(address, commitment=commitment)
         info = resp.value
@@ -50,7 +50,7 @@ class Serum3MarketIndexReservation:
         conn: AsyncClient,
         addresses: list[PublicKey],
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.List[typing.Optional["Serum3MarketIndexReservation"]]:
         infos = await get_multiple_accounts(conn, addresses, commitment=commitment)
         res: typing.List[typing.Optional["Serum3MarketIndexReservation"]] = []

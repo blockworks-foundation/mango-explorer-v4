@@ -8,7 +8,7 @@ from anchorpy.coder.accounts import ACCOUNT_DISCRIMINATOR_SIZE
 from anchorpy.error import AccountInvalidDiscriminator
 from anchorpy.utils.rpc import get_multiple_accounts
 from anchorpy.borsh_extension import BorshPubkey
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 from .. import types
 
 
@@ -42,7 +42,7 @@ class StubOracle:
         conn: AsyncClient,
         address: PublicKey,
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.Optional["StubOracle"]:
         resp = await conn.get_account_info(address, commitment=commitment)
         info = resp.value
@@ -59,7 +59,7 @@ class StubOracle:
         conn: AsyncClient,
         addresses: list[PublicKey],
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.List[typing.Optional["StubOracle"]]:
         infos = await get_multiple_accounts(conn, addresses, commitment=commitment)
         res: typing.List[typing.Optional["StubOracle"]] = []

@@ -5,7 +5,7 @@ from spl.token.constants import TOKEN_PROGRAM_ID
 from solana.transaction import TransactionInstruction, AccountMeta
 from construct import Construct
 import borsh_construct as borsh
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class FlashLoanBeginArgs(typing.TypedDict):
@@ -24,7 +24,7 @@ class FlashLoanBeginAccounts(typing.TypedDict):
 def flash_loan_begin(
     args: FlashLoanBeginArgs,
     accounts: FlashLoanBeginAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [

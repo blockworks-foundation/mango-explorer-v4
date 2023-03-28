@@ -268,6 +268,153 @@ class TokenPositionDoesNotExist(ProgramError):
     msg = "token position does not exist"
 
 
+class DepositsIntoLiquidatingMustRecover(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(
+            6029,
+            "token deposits into accounts that are being liquidated must bring their health above the init threshold",
+        )
+
+    code = 6029
+    name = "DepositsIntoLiquidatingMustRecover"
+    msg = "token deposits into accounts that are being liquidated must bring their health above the init threshold"
+
+
+class TokenInReduceOnlyMode(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6030, "token is in reduce only mode")
+
+    code = 6030
+    name = "TokenInReduceOnlyMode"
+    msg = "token is in reduce only mode"
+
+
+class MarketInReduceOnlyMode(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6031, "market is in reduce only mode")
+
+    code = 6031
+    name = "MarketInReduceOnlyMode"
+    msg = "market is in reduce only mode"
+
+
+class GroupIsHalted(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6032, "group is halted")
+
+    code = 6032
+    name = "GroupIsHalted"
+    msg = "group is halted"
+
+
+class PerpHasBaseLots(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6033, "the perp position has non-zero base lots")
+
+    code = 6033
+    name = "PerpHasBaseLots"
+    msg = "the perp position has non-zero base lots"
+
+
+class HasOpenOrUnsettledSerum3Orders(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6034, "there are open or unsettled serum3 orders")
+
+    code = 6034
+    name = "HasOpenOrUnsettledSerum3Orders"
+    msg = "there are open or unsettled serum3 orders"
+
+
+class HasLiquidatableTokenPosition(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6035, "has liquidatable token position")
+
+    code = 6035
+    name = "HasLiquidatableTokenPosition"
+    msg = "has liquidatable token position"
+
+
+class HasLiquidatablePerpBasePosition(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6036, "has liquidatable perp base position")
+
+    code = 6036
+    name = "HasLiquidatablePerpBasePosition"
+    msg = "has liquidatable perp base position"
+
+
+class HasLiquidatablePositivePerpPnl(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6037, "has liquidatable positive perp pnl")
+
+    code = 6037
+    name = "HasLiquidatablePositivePerpPnl"
+    msg = "has liquidatable positive perp pnl"
+
+
+class AccountIsFrozen(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6038, "account is frozen")
+
+    code = 6038
+    name = "AccountIsFrozen"
+    msg = "account is frozen"
+
+
+class InitAssetWeightCantBeNegative(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6039, "Init Asset Weight can't be negative")
+
+    code = 6039
+    name = "InitAssetWeightCantBeNegative"
+    msg = "Init Asset Weight can't be negative"
+
+
+class HasOpenPerpTakerFills(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6040, "has open perp taker fills")
+
+    code = 6040
+    name = "HasOpenPerpTakerFills"
+    msg = "has open perp taker fills"
+
+
+class DepositLimit(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6041, "deposit crosses the current group deposit limit")
+
+    code = 6041
+    name = "DepositLimit"
+    msg = "deposit crosses the current group deposit limit"
+
+
+class IxIsDisabled(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6042, "instruction is disabled")
+
+    code = 6042
+    name = "IxIsDisabled"
+    msg = "instruction is disabled"
+
+
+class NoLiquidatablePerpBasePosition(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6043, "no liquidatable perp base position")
+
+    code = 6043
+    name = "NoLiquidatablePerpBasePosition"
+    msg = "no liquidatable perp base position"
+
+
+class PerpOrderIdNotFound(ProgramError):
+    def __init__(self) -> None:
+        super().__init__(6044, "perp order id not found on the orderbook")
+
+    code = 6044
+    name = "PerpOrderIdNotFound"
+    msg = "perp order id not found on the orderbook"
+
+
 CustomError = typing.Union[
     SomeError,
     NotImplementedError,
@@ -298,6 +445,22 @@ CustomError = typing.Union[
     BankBorrowLimitReached,
     BankNetBorrowsLimitReached,
     TokenPositionDoesNotExist,
+    DepositsIntoLiquidatingMustRecover,
+    TokenInReduceOnlyMode,
+    MarketInReduceOnlyMode,
+    GroupIsHalted,
+    PerpHasBaseLots,
+    HasOpenOrUnsettledSerum3Orders,
+    HasLiquidatableTokenPosition,
+    HasLiquidatablePerpBasePosition,
+    HasLiquidatablePositivePerpPnl,
+    AccountIsFrozen,
+    InitAssetWeightCantBeNegative,
+    HasOpenPerpTakerFills,
+    DepositLimit,
+    IxIsDisabled,
+    NoLiquidatablePerpBasePosition,
+    PerpOrderIdNotFound,
 ]
 CUSTOM_ERROR_MAP: dict[int, CustomError] = {
     6000: SomeError(),
@@ -329,6 +492,22 @@ CUSTOM_ERROR_MAP: dict[int, CustomError] = {
     6026: BankBorrowLimitReached(),
     6027: BankNetBorrowsLimitReached(),
     6028: TokenPositionDoesNotExist(),
+    6029: DepositsIntoLiquidatingMustRecover(),
+    6030: TokenInReduceOnlyMode(),
+    6031: MarketInReduceOnlyMode(),
+    6032: GroupIsHalted(),
+    6033: PerpHasBaseLots(),
+    6034: HasOpenOrUnsettledSerum3Orders(),
+    6035: HasLiquidatableTokenPosition(),
+    6036: HasLiquidatablePerpBasePosition(),
+    6037: HasLiquidatablePositivePerpPnl(),
+    6038: AccountIsFrozen(),
+    6039: InitAssetWeightCantBeNegative(),
+    6040: HasOpenPerpTakerFills(),
+    6041: DepositLimit(),
+    6042: IxIsDisabled(),
+    6043: NoLiquidatablePerpBasePosition(),
+    6044: PerpOrderIdNotFound(),
 }
 
 

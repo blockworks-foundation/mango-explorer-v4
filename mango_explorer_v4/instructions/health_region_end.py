@@ -2,7 +2,7 @@ from __future__ import annotations
 import typing
 from solana.publickey import PublicKey
 from solana.transaction import TransactionInstruction, AccountMeta
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class HealthRegionEndAccounts(typing.TypedDict):
@@ -11,7 +11,7 @@ class HealthRegionEndAccounts(typing.TypedDict):
 
 def health_region_end(
     accounts: HealthRegionEndAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [

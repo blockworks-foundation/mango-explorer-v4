@@ -3,7 +3,7 @@ import typing
 from solana.publickey import PublicKey
 from solana.transaction import TransactionInstruction, AccountMeta
 import borsh_construct as borsh
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class Serum3CancelAllOrdersArgs(typing.TypedDict):
@@ -29,7 +29,7 @@ class Serum3CancelAllOrdersAccounts(typing.TypedDict):
 def serum3_cancel_all_orders(
     args: Serum3CancelAllOrdersArgs,
     accounts: Serum3CancelAllOrdersAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [

@@ -8,13 +8,14 @@ from anchorpy.coder.accounts import ACCOUNT_DISCRIMINATOR_SIZE
 from anchorpy.error import AccountInvalidDiscriminator
 from anchorpy.utils.rpc import get_multiple_accounts
 from anchorpy.borsh_extension import BorshPubkey
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class Serum3MarketJSON(typing.TypedDict):
     group: str
     base_token_index: int
     quote_token_index: int
+    reduce_only: int
     padding1: list[int]
     name: list[int]
     serum_program: str
@@ -33,7 +34,8 @@ class Serum3Market:
         "group" / BorshPubkey,
         "base_token_index" / borsh.U16,
         "quote_token_index" / borsh.U16,
-        "padding1" / borsh.U8[4],
+        "reduce_only" / borsh.U8,
+        "padding1" / borsh.U8[3],
         "name" / borsh.U8[16],
         "serum_program" / BorshPubkey,
         "serum_market_external" / BorshPubkey,
@@ -46,6 +48,7 @@ class Serum3Market:
     group: PublicKey
     base_token_index: int
     quote_token_index: int
+    reduce_only: int
     padding1: list[int]
     name: list[int]
     serum_program: PublicKey
@@ -62,7 +65,7 @@ class Serum3Market:
         conn: AsyncClient,
         address: PublicKey,
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.Optional["Serum3Market"]:
         resp = await conn.get_account_info(address, commitment=commitment)
         info = resp.value
@@ -79,7 +82,7 @@ class Serum3Market:
         conn: AsyncClient,
         addresses: list[PublicKey],
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.List[typing.Optional["Serum3Market"]]:
         infos = await get_multiple_accounts(conn, addresses, commitment=commitment)
         res: typing.List[typing.Optional["Serum3Market"]] = []
@@ -103,6 +106,7 @@ class Serum3Market:
             group=dec.group,
             base_token_index=dec.base_token_index,
             quote_token_index=dec.quote_token_index,
+            reduce_only=dec.reduce_only,
             padding1=dec.padding1,
             name=dec.name,
             serum_program=dec.serum_program,
@@ -119,6 +123,7 @@ class Serum3Market:
             "group": str(self.group),
             "base_token_index": self.base_token_index,
             "quote_token_index": self.quote_token_index,
+            "reduce_only": self.reduce_only,
             "padding1": self.padding1,
             "name": self.name,
             "serum_program": str(self.serum_program),
@@ -136,6 +141,7 @@ class Serum3Market:
             group=PublicKey(obj["group"]),
             base_token_index=obj["base_token_index"],
             quote_token_index=obj["quote_token_index"],
+            reduce_only=obj["reduce_only"],
             padding1=obj["padding1"],
             name=obj["name"],
             serum_program=PublicKey(obj["serum_program"]),

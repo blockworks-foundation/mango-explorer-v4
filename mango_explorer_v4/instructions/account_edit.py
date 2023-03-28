@@ -4,7 +4,7 @@ from solana.publickey import PublicKey
 from solana.transaction import TransactionInstruction, AccountMeta
 from anchorpy.borsh_extension import BorshPubkey
 import borsh_construct as borsh
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class AccountEditArgs(typing.TypedDict):
@@ -26,7 +26,7 @@ class AccountEditAccounts(typing.TypedDict):
 def account_edit(
     args: AccountEditArgs,
     accounts: AccountEditAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [

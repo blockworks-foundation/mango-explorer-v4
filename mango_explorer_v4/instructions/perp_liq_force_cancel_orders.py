@@ -3,7 +3,7 @@ import typing
 from solana.publickey import PublicKey
 from solana.transaction import TransactionInstruction, AccountMeta
 import borsh_construct as borsh
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class PerpLiqForceCancelOrdersArgs(typing.TypedDict):
@@ -24,7 +24,7 @@ class PerpLiqForceCancelOrdersAccounts(typing.TypedDict):
 def perp_liq_force_cancel_orders(
     args: PerpLiqForceCancelOrdersArgs,
     accounts: PerpLiqForceCancelOrdersAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [

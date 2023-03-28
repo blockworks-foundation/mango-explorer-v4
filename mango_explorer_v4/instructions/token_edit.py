@@ -5,7 +5,7 @@ from solana.transaction import TransactionInstruction, AccountMeta
 from anchorpy.borsh_extension import BorshPubkey
 import borsh_construct as borsh
 from .. import types
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class TokenEditArgs(typing.TypedDict):
@@ -32,6 +32,8 @@ class TokenEditArgs(typing.TypedDict):
     deposit_weight_scale_start_quote_opt: typing.Optional[float]
     reset_stable_price: bool
     reset_net_borrow_limit: bool
+    reduce_only_opt: typing.Optional[bool]
+    name_opt: typing.Optional[str]
 
 
 layout = borsh.CStruct(
@@ -58,6 +60,8 @@ layout = borsh.CStruct(
     "deposit_weight_scale_start_quote_opt" / borsh.Option(borsh.F64),
     "reset_stable_price" / borsh.Bool,
     "reset_net_borrow_limit" / borsh.Bool,
+    "reduce_only_opt" / borsh.Option(borsh.Bool),
+    "name_opt" / borsh.Option(borsh.String),
 )
 
 
@@ -71,7 +75,7 @@ class TokenEditAccounts(typing.TypedDict):
 def token_edit(
     args: TokenEditArgs,
     accounts: TokenEditAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [
@@ -126,6 +130,8 @@ def token_edit(
             ],
             "reset_stable_price": args["reset_stable_price"],
             "reset_net_borrow_limit": args["reset_net_borrow_limit"],
+            "reduce_only_opt": args["reduce_only_opt"],
+            "name_opt": args["name_opt"],
         }
     )
     data = identifier + encoded_args

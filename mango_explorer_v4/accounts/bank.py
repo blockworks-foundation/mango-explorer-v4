@@ -8,7 +8,7 @@ from anchorpy.coder.accounts import ACCOUNT_DISCRIMINATOR_SIZE
 from anchorpy.error import AccountInvalidDiscriminator
 from anchorpy.utils.rpc import get_multiple_accounts
 from anchorpy.borsh_extension import BorshPubkey
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 from .. import types
 
 
@@ -55,6 +55,7 @@ class BankJSON(typing.TypedDict):
     net_borrows_in_window: int
     borrow_weight_scale_start_quote: float
     deposit_weight_scale_start_quote: float
+    reduce_only: int
     reserved: list[int]
 
 
@@ -104,7 +105,8 @@ class Bank:
         "net_borrows_in_window" / borsh.I64,
         "borrow_weight_scale_start_quote" / borsh.F64,
         "deposit_weight_scale_start_quote" / borsh.F64,
-        "reserved" / borsh.U8[2120],
+        "reduce_only" / borsh.U8,
+        "reserved" / borsh.U8[2119],
     )
     group: PublicKey
     name: list[int]
@@ -148,6 +150,7 @@ class Bank:
     net_borrows_in_window: int
     borrow_weight_scale_start_quote: float
     deposit_weight_scale_start_quote: float
+    reduce_only: int
     reserved: list[int]
 
     @classmethod
@@ -156,7 +159,7 @@ class Bank:
         conn: AsyncClient,
         address: PublicKey,
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.Optional["Bank"]:
         resp = await conn.get_account_info(address, commitment=commitment)
         info = resp.value
@@ -173,7 +176,7 @@ class Bank:
         conn: AsyncClient,
         addresses: list[PublicKey],
         commitment: typing.Optional[Commitment] = None,
-        program_id: PublicKey = MANGO_PROGRAM_ID,
+        program_id: PublicKey = PROGRAM_ID,
     ) -> typing.List[typing.Optional["Bank"]]:
         infos = await get_multiple_accounts(conn, addresses, commitment=commitment)
         res: typing.List[typing.Optional["Bank"]] = []
@@ -244,6 +247,7 @@ class Bank:
             net_borrows_in_window=dec.net_borrows_in_window,
             borrow_weight_scale_start_quote=dec.borrow_weight_scale_start_quote,
             deposit_weight_scale_start_quote=dec.deposit_weight_scale_start_quote,
+            reduce_only=dec.reduce_only,
             reserved=dec.reserved,
         )
 
@@ -291,6 +295,7 @@ class Bank:
             "net_borrows_in_window": self.net_borrows_in_window,
             "borrow_weight_scale_start_quote": self.borrow_weight_scale_start_quote,
             "deposit_weight_scale_start_quote": self.deposit_weight_scale_start_quote,
+            "reduce_only": self.reduce_only,
             "reserved": self.reserved,
         }
 
@@ -347,5 +352,6 @@ class Bank:
             net_borrows_in_window=obj["net_borrows_in_window"],
             borrow_weight_scale_start_quote=obj["borrow_weight_scale_start_quote"],
             deposit_weight_scale_start_quote=obj["deposit_weight_scale_start_quote"],
+            reduce_only=obj["reduce_only"],
             reserved=obj["reserved"],
         )

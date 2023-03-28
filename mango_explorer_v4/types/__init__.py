@@ -1,4 +1,6 @@
 import typing
+from . import interest_rate_params
+from .interest_rate_params import InterestRateParams, InterestRateParamsJSON
 from . import equity
 from .equity import Equity, EquityJSON
 from . import token_equity
@@ -15,8 +17,6 @@ from . import perp_info
 from .perp_info import PerpInfo, PerpInfoJSON
 from . import health_cache
 from .health_cache import HealthCache, HealthCacheJSON
-from . import interest_rate_params
-from .interest_rate_params import InterestRateParams, InterestRateParamsJSON
 from . import flash_loan_token_detail
 from .flash_loan_token_detail import FlashLoanTokenDetail, FlashLoanTokenDetailJSON
 from . import token_position
@@ -61,8 +61,6 @@ from . import perp_market_index
 from .perp_market_index import PerpMarketIndex, PerpMarketIndexJSON
 from . import i80f48
 from .i80f48 import I80F48, I80F48JSON
-from . import health_type
-from .health_type import HealthTypeKind, HealthTypeJSON
 from . import flash_loan_type
 from .flash_loan_type import FlashLoanTypeKind, FlashLoanTypeJSON
 from . import serum3_self_trade_behavior
@@ -74,11 +72,15 @@ from . import serum3_order_type
 from .serum3_order_type import Serum3OrderTypeKind, Serum3OrderTypeJSON
 from . import serum3_side
 from .serum3_side import Serum3SideKind, Serum3SideJSON
+from . import health_type
+from .health_type import HealthTypeKind, HealthTypeJSON
 from . import loan_origination_fee_instruction
 from .loan_origination_fee_instruction import (
     LoanOriginationFeeInstructionKind,
     LoanOriginationFeeInstructionJSON,
 )
+from . import ix_gate
+from .ix_gate import IxGateKind, IxGateJSON
 from . import oracle_type
 from .oracle_type import OracleTypeKind, OracleTypeJSON
 from . import order_state

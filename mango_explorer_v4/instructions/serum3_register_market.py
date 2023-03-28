@@ -4,7 +4,7 @@ from solana.publickey import PublicKey
 from solana.system_program import SYS_PROGRAM_ID
 from solana.transaction import TransactionInstruction, AccountMeta
 import borsh_construct as borsh
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class Serum3RegisterMarketArgs(typing.TypedDict):
@@ -30,7 +30,7 @@ class Serum3RegisterMarketAccounts(typing.TypedDict):
 def serum3_register_market(
     args: Serum3RegisterMarketArgs,
     accounts: Serum3RegisterMarketAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [

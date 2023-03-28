@@ -20,6 +20,10 @@ class MangoAccountFixedJSON(typing.TypedDict):
     net_deposits: int
     perp_spot_transfers: int
     health_region_begin_init_health: int
+    frozen_until: int
+    buyback_fees_accrued_current: int
+    buyback_fees_accrued_previous: int
+    buyback_fees_expiry_timestamp: int
     reserved: list[int]
 
 
@@ -38,7 +42,11 @@ class MangoAccountFixed:
         "net_deposits" / borsh.I64,
         "perp_spot_transfers" / borsh.I64,
         "health_region_begin_init_health" / borsh.I64,
-        "reserved" / borsh.U8[240],
+        "frozen_until" / borsh.U64,
+        "buyback_fees_accrued_current" / borsh.U64,
+        "buyback_fees_accrued_previous" / borsh.U64,
+        "buyback_fees_expiry_timestamp" / borsh.U64,
+        "reserved" / borsh.U8[208],
     )
     group: PublicKey
     owner: PublicKey
@@ -52,6 +60,10 @@ class MangoAccountFixed:
     net_deposits: int
     perp_spot_transfers: int
     health_region_begin_init_health: int
+    frozen_until: int
+    buyback_fees_accrued_current: int
+    buyback_fees_accrued_previous: int
+    buyback_fees_expiry_timestamp: int
     reserved: list[int]
 
     @classmethod
@@ -69,6 +81,10 @@ class MangoAccountFixed:
             net_deposits=obj.net_deposits,
             perp_spot_transfers=obj.perp_spot_transfers,
             health_region_begin_init_health=obj.health_region_begin_init_health,
+            frozen_until=obj.frozen_until,
+            buyback_fees_accrued_current=obj.buyback_fees_accrued_current,
+            buyback_fees_accrued_previous=obj.buyback_fees_accrued_previous,
+            buyback_fees_expiry_timestamp=obj.buyback_fees_expiry_timestamp,
             reserved=obj.reserved,
         )
 
@@ -86,6 +102,10 @@ class MangoAccountFixed:
             "net_deposits": self.net_deposits,
             "perp_spot_transfers": self.perp_spot_transfers,
             "health_region_begin_init_health": self.health_region_begin_init_health,
+            "frozen_until": self.frozen_until,
+            "buyback_fees_accrued_current": self.buyback_fees_accrued_current,
+            "buyback_fees_accrued_previous": self.buyback_fees_accrued_previous,
+            "buyback_fees_expiry_timestamp": self.buyback_fees_expiry_timestamp,
             "reserved": self.reserved,
         }
 
@@ -103,6 +123,10 @@ class MangoAccountFixed:
             "net_deposits": self.net_deposits,
             "perp_spot_transfers": self.perp_spot_transfers,
             "health_region_begin_init_health": self.health_region_begin_init_health,
+            "frozen_until": self.frozen_until,
+            "buyback_fees_accrued_current": self.buyback_fees_accrued_current,
+            "buyback_fees_accrued_previous": self.buyback_fees_accrued_previous,
+            "buyback_fees_expiry_timestamp": self.buyback_fees_expiry_timestamp,
             "reserved": self.reserved,
         }
 
@@ -121,5 +145,9 @@ class MangoAccountFixed:
             net_deposits=obj["net_deposits"],
             perp_spot_transfers=obj["perp_spot_transfers"],
             health_region_begin_init_health=obj["health_region_begin_init_health"],
+            frozen_until=obj["frozen_until"],
+            buyback_fees_accrued_current=obj["buyback_fees_accrued_current"],
+            buyback_fees_accrued_previous=obj["buyback_fees_accrued_previous"],
+            buyback_fees_expiry_timestamp=obj["buyback_fees_expiry_timestamp"],
             reserved=obj["reserved"],
         )

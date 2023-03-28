@@ -4,7 +4,7 @@ from solana.publickey import PublicKey
 from spl.token.constants import TOKEN_PROGRAM_ID
 from solana.transaction import TransactionInstruction, AccountMeta
 import borsh_construct as borsh
-from ..program_id import MANGO_PROGRAM_ID
+from ..program_id import PROGRAM_ID
 
 
 class Serum3LiqForceCancelOrdersArgs(typing.TypedDict):
@@ -36,7 +36,7 @@ class Serum3LiqForceCancelOrdersAccounts(typing.TypedDict):
 def serum3_liq_force_cancel_orders(
     args: Serum3LiqForceCancelOrdersArgs,
     accounts: Serum3LiqForceCancelOrdersAccounts,
-    program_id: PublicKey = MANGO_PROGRAM_ID,
+    program_id: PublicKey = PROGRAM_ID,
     remaining_accounts: typing.Optional[typing.List[AccountMeta]] = None,
 ) -> TransactionInstruction:
     keys: list[AccountMeta] = [
