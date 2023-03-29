@@ -13,7 +13,7 @@ async def main():
     parser.add_argument(
         '--symbol',
         required=False,
-        default='SOL/USDC'
+        default='SOL-PERP'
     )
 
     parser.add_argument(

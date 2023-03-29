@@ -12,7 +12,7 @@ from typing import Literal, Any
 
 import aiostream.stream
 
-from .constants import RUST_U64_MAX, RUST_I64_MAX, QUOTE_DECIMALS
+from .constants import RUST_U64_MAX, RUST_I64_MAX, QUOTE_DECIMALS, SERUM_PROGRAM_ID
 from .oracles import pyth
 from .constructs.book_side_items import BookSideItems
 
@@ -27,6 +27,8 @@ from solana.rpc.websocket_api import connect
 from solana.transaction import AccountMeta, Transaction
 from solders.rpc.responses import AccountNotification
 
+
+from mango_explorer_v4.program_id import PROGRAM_ID as MANGO_PROGRAM_ID
 from mango_explorer_v4.types.side import Bid, Ask
 from mango_explorer_v4.types.place_order_type import Limit
 from mango_explorer_v4.types.any_event import AnyEvent
@@ -46,10 +48,9 @@ from mango_explorer_v4.instructions.serum3_place_order import Serum3PlaceOrderAr
 from mango_explorer_v4.instructions.perp_place_order import PerpPlaceOrderArgs, PerpPlaceOrderAccounts, perp_place_order
 from mango_explorer_v4.instructions.perp_cancel_all_orders import PerpCancelAllOrdersArgs, PerpCancelAllOrdersAccounts, perp_cancel_all_orders
 from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrderPeggedArgs, PerpPlaceOrderPeggedAccounts, perp_place_order_pegged
-from mango_explorer_v4.program_id import SERUM_PROGRAM_ID, MANGO_PROGRAM_ID
 from mango_explorer_v4.types import serum3_side, serum3_self_trade_behavior, serum3_order_type
 from mango_explorer_v4.types import place_order_type
-
+from mango_explorer_v4.utils import perp_market as perp_market_utils
 
 logging.basicConfig(
     level=logging.INFO
@@ -1034,7 +1035,7 @@ class MangoClient():
 
                 fills = sorted(
                     [FillEvent.layout.parse(bytes([event.event_type] + event.padding)) for event in event_queue.buf if event.event_type == 0],
-                    key=lambda fill: fill.seq_num
+                    key=lambda fill: fill.timestamp
                 )
 
                 return {
@@ -1045,8 +1046,10 @@ class MangoClient():
                             'taker': str(fill.taker),
                             'maker': str(fill.maker),
                             'side': 'bids' if fill.taker_side else 'asks',
-                            'price': perp_market.price_lots_to_ui(fill.price),
-                            'size': perp_market.base_lots_to_ui(fill.quantity),
+                            # 'price': perp_market_utils.price_lots_to_ui(perp_market, fill.price),
+                            # 'size': perp_market_utils.base_lots_to_ui(perp_market, fill.quantity),
+                            'price': fill.price,
+                            'size': fill.quantity,
                             'timestamp': fill.timestamp
                         }
                         for fill in fills
@@ -1101,8 +1104,8 @@ class MangoClient():
                                             'taker': fill.taker,
                                             'maker': fill.maker,
                                             'side': 'bids' if fill.taker_side else 'asks',
-                                            'price': perp_market.price_lots_to_ui(fill.price),
-                                            'size': perp_market.base_lots_to_ui(fill.quantity),
+                                            'price': fill.price,
+                                            'size': fill.quantity,
                                             'timestamp': fill.timestamp
                                         }
                                         for fill in fills
@@ -1124,8 +1127,8 @@ class MangoClient():
                                             'taker': str(fill.taker),
                                             'maker': str(fill.maker),
                                             'side': 'bids' if fill.taker_side else 'asks',
-                                            'price': perp_market.price_lots_to_ui(fill.price),
-                                            'size': perp_market.base_lots_to_ui(fill.quantity),
+                                            'price': fill.price,
+                                            'size': fill.quantity,
                                             'timestamp': fill.timestamp
                                         }
                                         for fill in fills

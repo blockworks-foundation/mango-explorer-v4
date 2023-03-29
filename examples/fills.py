@@ -30,7 +30,10 @@ async def main():
         mango_account_pk=config['mango_account_pk']
     )
 
-    print(json.dumps(await mango_client.fills(args.symbol)))
+    response = await mango_client.fills(args.symbol)
+
+    for fill in response['fills']:
+        print(fill)
 
 
 if __name__ == '__main__':
