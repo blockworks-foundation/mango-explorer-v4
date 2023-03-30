@@ -44,6 +44,18 @@
           "oracle": "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG",
           "active": true,
           "settleTokenIndex": 0
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "Fgh9JSZ2qfSjCw9RPJ85W2xbihsp2muLvfRztzoVR7f1",
+          "marketIndex": 3,
+          "name": "ETH-PERP",
+          "baseDecimals": 6,
+          "baseLotSize": 100,
+          "quoteLotSize": 1,
+          "oracle": "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB",
+          "active": true,
+          "settleTokenIndex": 0
         }
       ],
       "tokens": [

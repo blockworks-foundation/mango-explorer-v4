@@ -1031,11 +1031,18 @@ class MangoClient():
 
                 response = await self.provider.connection.get_account_info(perp_market.event_queue)
 
-                event_queue = EventQueue.layout.parse(response.value.data)
+                event_queue = EventQueue.decode(response.value.data)
 
                 fills = sorted(
-                    [FillEvent.layout.parse(bytes([event.event_type] + event.padding)) for event in event_queue.buf if event.event_type == 0],
-                    key=lambda fill: fill.timestamp
+                    [
+                        fill
+                        for fill in [
+                            FillEvent.layout.parse(bytes([event.event_type] + event.padding))
+                            for event in event_queue.buf
+                            if event.event_type == 0
+                        ]
+                    ],
+                    key=lambda fill: fill.seq_num
                 )
 
                 return {
@@ -1043,13 +1050,11 @@ class MangoClient():
                     'fills': [
                         {
                             'seq_num': fill.seq_num,
-                            'taker': str(fill.taker),
-                            'maker': str(fill.maker),
                             'side': 'bids' if fill.taker_side else 'asks',
-                            # 'price': perp_market_utils.price_lots_to_ui(perp_market, fill.price),
-                            # 'size': perp_market_utils.base_lots_to_ui(perp_market, fill.quantity),
-                            'price': fill.price,
-                            'size': fill.quantity,
+                            'price': perp_market_utils.price_lots_to_ui(perp_market, fill.price),
+                            'size': perp_market_utils.base_lots_to_ui(perp_market, fill.quantity),
+                            'taker': fill.taker,
+                            'maker': fill.maker,
                             'timestamp': fill.timestamp
                         }
                         for fill in fills
