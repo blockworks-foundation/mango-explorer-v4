@@ -1129,9 +1129,9 @@ class MangoClient():
                             lead = fills[-1:][0].seq_num
 
     async def equity(self):
-        oracle_price_by_token_index = {}
+        oracle_ui_price_by_token_index = {}
 
-        oracle_price_by_oracle_pk = {}
+        oracle_ui_price_by_oracle_pk = {}
 
         for bank, raw_oracle in zip(
             self.banks,
@@ -1148,9 +1148,9 @@ class MangoClient():
 
                 oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
 
-            oracle_price_by_token_index[bank.token_index] = oracle_price
+            oracle_ui_price_by_token_index[bank.token_index] = oracle_price
 
-            oracle_price_by_oracle_pk[bank.oracle] = oracle_price
+            oracle_ui_price_by_oracle_pk[bank.oracle] = oracle_price
 
         balance_by_token_index = {}
 
@@ -1161,7 +1161,9 @@ class MangoClient():
             )
             for token in filter(token_position_utils.is_active, self.mango_account.tokens)
         ]:
-            balance_by_token_index[token.token_index] = Decimal(str(token_position_utils.balance(token, bank))) * oracle_price_by_token_index[token.token_index]
+            oracle_ui_price = oracle_ui_price_by_token_index[token.token_index]
+
+            balance_by_token_index[token.token_index] = Decimal(str(token_position_utils.balance(token, bank))) * oracle_ui_price
 
         active_open_orders = [open_orders for open_orders in self.mango_account.serum3 if serum3_utils.is_active(open_orders)]
 
@@ -1175,12 +1177,12 @@ class MangoClient():
         ):
             # TODO: Account for referrerRebatesAccrued - this isn't available yet in pyserum
 
-            balance_by_token_index[open_orders.base_token_index] += open_orders_external.base_token_total * oracle_price_by_token_index[open_orders.base_token_index]
+            balance_by_token_index[open_orders.base_token_index] += open_orders_external.base_token_total * oracle_ui_price_by_token_index[open_orders.base_token_index]
 
         token_equity = sum(balance_by_token_index.values())
 
         perp_equity = sum([
-            perp_utils.equity(perp_position, perp_market, oracle_price_by_oracle_pk[perp_market.oracle])
+            perp_utils.equity(perp_position, perp_market, oracle_ui_price_by_oracle_pk[perp_market.oracle])
             for perp_position, perp_market in [
                 (
                     perp_position,
@@ -1192,20 +1194,3 @@ class MangoClient():
         ])
 
         return token_equity + perp_equity
-
-        # open_orders_by_market_index = {
-        #     serum3.market_index: serum3.open_orders
-        #     for serum3 in filter(serum3_utils.is_active, self.mango_account.serum3)
-        # }
-        #
-        # open_orders_by_market_index = dict(
-        #     zip(
-        #         open_orders_by_market_index.keys(),
-        #         await asyncio.gather(*[AsyncOpenOrdersAccount.load(self.provider.connection, value) for value in open_orders_by_market_index.values()])
-        #     )
-        # )
-        #
-        # for market_index, open_orders in open_orders_by_market_index.items():
-        #     print(market_index, open_orders)
-        #
-        #     self.banks

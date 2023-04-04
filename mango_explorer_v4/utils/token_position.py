@@ -1,6 +1,6 @@
 from mango_explorer_v4.types.token_position import TokenPosition
 from mango_explorer_v4.accounts.bank import Bank
-from mango_explorer_v4.utils import i80f48 as i80f48_utils
+from decimal import Decimal
 
 
 def is_active(token_position: TokenPosition):
@@ -8,8 +8,8 @@ def is_active(token_position: TokenPosition):
 
 
 def balance(token_position: TokenPosition, bank: Bank):
-    token_position = i80f48_utils.parse(token_position.indexed_position)
+    token_position = token_position.indexed_position.to_decimal()
 
     bank_index = bank.deposit_index if token_position > 0 else bank.borrow_index
 
-    return i80f48_utils.parse(bank_index) * token_position
+    return (bank_index.to_decimal() * token_position) / Decimal(str(10 ** bank.mint_decimals))
