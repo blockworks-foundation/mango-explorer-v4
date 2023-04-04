@@ -51,10 +51,10 @@ from mango_explorer_v4.instructions.perp_cancel_all_orders import PerpCancelAllO
 from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrderPeggedArgs, PerpPlaceOrderPeggedAccounts, perp_place_order_pegged
 from mango_explorer_v4.types import serum3_side, serum3_self_trade_behavior, serum3_order_type
 from mango_explorer_v4.types import place_order_type
-from mango_explorer_v4.utils import perp_market as perp_market_utils
-from mango_explorer_v4.utils import token_position as token_position_utils
-from mango_explorer_v4.utils import serum3 as serum3_utils
-from mango_explorer_v4.utils import perp as perp_utils
+from mango_explorer_v4.helpers import perp_market as perp_market_utils
+from mango_explorer_v4.helpers import token_position as token_position_utils
+from mango_explorer_v4.helpers import serum3 as serum3_utils
+from mango_explorer_v4.helpers.perp_position import PerpPositionHelper
 
 logging.basicConfig(
     level=logging.INFO
@@ -1182,15 +1182,18 @@ class MangoClient():
         token_equity = sum(balance_by_token_index.values())
 
         perp_equity = sum([
-            perp_utils.equity(perp_position, perp_market, oracle_ui_price_by_oracle_pk[perp_market.oracle])
+            PerpPositionHelper.equity(perp_position, perp_market, oracle_ui_price_by_oracle_pk[perp_market.oracle])
             for perp_position, perp_market in [
                 (
                     perp_position,
                     [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_position.market_index][0]
                 )
                 for perp_position in self.mango_account.perps
-                if perp_utils.is_active(perp_position)
+                if PerpPositionHelper.is_active(perp_position)
             ]
         ])
 
         return token_equity + perp_equity
+
+    async def base_position_size(self, symbol: str):
+        pass
