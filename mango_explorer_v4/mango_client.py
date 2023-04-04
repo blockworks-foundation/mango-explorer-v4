@@ -51,9 +51,9 @@ from mango_explorer_v4.instructions.perp_cancel_all_orders import PerpCancelAllO
 from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrderPeggedArgs, PerpPlaceOrderPeggedAccounts, perp_place_order_pegged
 from mango_explorer_v4.types import serum3_side, serum3_self_trade_behavior, serum3_order_type
 from mango_explorer_v4.types import place_order_type
-from mango_explorer_v4.helpers import perp_market as perp_market_utils
 from mango_explorer_v4.helpers import token_position as token_position_utils
 from mango_explorer_v4.helpers import serum3 as serum3_utils
+from mango_explorer_v4.helpers.perp_market import PerpMarketHelper
 from mango_explorer_v4.helpers.perp_position import PerpPositionHelper
 
 logging.basicConfig(
@@ -1055,8 +1055,8 @@ class MangoClient():
                     'fills': [
                         {
                             'side': 'bids' if fill.taker_side else 'asks',
-                            'price': perp_market_utils.price_lots_to_ui(perp_market, fill.price),
-                            'size': perp_market_utils.base_lots_to_ui(perp_market, fill.quantity),
+                            'price': PerpMarketHelper.price_lots_to_ui(perp_market, fill.price),
+                            'size': PerpMarketHelper.base_lots_to_ui(perp_market, fill.quantity),
                             'taker': fill.taker,
                             'maker': fill.maker,
                             'timestamp': fill.timestamp
@@ -1115,8 +1115,8 @@ class MangoClient():
                                 'fills': [
                                     {
                                         'side': 'bids' if fill.taker_side else 'asks',
-                                        'price': perp_market_utils.price_lots_to_ui(perp_market, fill.price),
-                                        'size': perp_market_utils.base_lots_to_ui(perp_market, fill.quantity),
+                                        'price': PerpMarketHelper.price_lots_to_ui(perp_market, fill.price),
+                                        'size': PerpMarketHelper.base_lots_to_ui(perp_market, fill.quantity),
                                         'taker': fill.taker,
                                         'maker': fill.maker,
                                         'timestamp': fill.timestamp

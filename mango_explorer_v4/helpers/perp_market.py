@@ -6,7 +6,6 @@ from decimal import Decimal
 class PerpMarketHelper():
     perp_market: PerpMarket
 
-
     @staticmethod
     def price_lots_to_ui(perp_market, price_lots: int):
         return float(Decimal(price_lots) * Decimal(10) ** Decimal(perp_market.base_decimals - QUOTE_DECIMALS) * Decimal(perp_market.quote_lot_size) / Decimal(perp_market.base_lot_size))
@@ -31,28 +30,3 @@ class PerpMarketHelper():
     @staticmethod
     def ui_quote_to_lots(perp_market, ui_quote: float) -> int:
         return int(Decimal(ui_quote * 10 ** QUOTE_DECIMALS) / Decimal(perp_market.quote_lot_size))
-
-
-def price_lots_to_ui(perp_market, price_lots: int):
-    return float(Decimal(price_lots) * Decimal(10) ** Decimal(perp_market.base_decimals - QUOTE_DECIMALS) * Decimal(perp_market.quote_lot_size) / Decimal(perp_market.base_lot_size))
-
-
-def base_lots_to_ui(perp_market, base_lots: int):
-    return float(Decimal(base_lots) * (Decimal(perp_market.base_lot_size) / Decimal(10) ** Decimal(perp_market.base_decimals)))
-
-
-def quote_lots_to_ui(perp_market, quote_lots: int):
-    raise NotImplementedError
-
-
-def ui_price_to_lots(perp_market, ui_price: float) -> int:
-    return int(Decimal(ui_price * 10 ** QUOTE_DECIMALS) * Decimal(perp_market.base_lot_size) / Decimal(
-        perp_market.quote_lot_size * 10 ** perp_market.base_decimals))
-
-
-def ui_base_to_lots(perp_market, ui_base: float) -> int:
-    return int(Decimal(ui_base * 10 ** perp_market.base_decimals) / Decimal(perp_market.base_lot_size))
-
-
-def ui_quote_to_lots(perp_market, ui_quote: float) -> int:
-    return int(Decimal(ui_quote * 10 ** QUOTE_DECIMALS) / Decimal(perp_market.quote_lot_size))
