@@ -3,6 +3,7 @@ import typing
 from dataclasses import dataclass
 from construct import Container
 import borsh_construct as borsh
+import decimal
 
 
 class I80F48JSON(typing.TypedDict):
@@ -27,3 +28,6 @@ class I80F48:
     @classmethod
     def from_json(cls, obj: I80F48JSON) -> "I80F48":
         return cls(val=obj["val"])
+
+    def to_decimal(self) -> decimal.Decimal:
+        return decimal.Decimal(self.val) / decimal.Decimal(2 ** 48)

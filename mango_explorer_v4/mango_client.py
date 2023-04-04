@@ -19,6 +19,7 @@ from .constructs.book_side_items import BookSideItems
 import base58
 from anchorpy import Provider, Wallet
 from pyserum.market import AsyncMarket, OrderBook
+from pyserum.async_open_orders_account import AsyncOpenOrdersAccount
 from solana.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
@@ -51,6 +52,9 @@ from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrde
 from mango_explorer_v4.types import serum3_side, serum3_self_trade_behavior, serum3_order_type
 from mango_explorer_v4.types import place_order_type
 from mango_explorer_v4.utils import perp_market as perp_market_utils
+from mango_explorer_v4.utils import token_position as token_position_utils
+from mango_explorer_v4.utils import serum3 as serum3_utils
+from mango_explorer_v4.utils import perp as perp_utils
 
 logging.basicConfig(
     level=logging.INFO
@@ -71,7 +75,7 @@ class MangoClient():
     mint_infos: [MintInfo]
     perp_markets: [PerpMarket]
     rpc_url: str
-    group: Group
+    # group: Group
 
     @staticmethod
     async def connect(
@@ -111,7 +115,7 @@ class MangoClient():
 
         group_config = [group_config for group_config in ids['groups'] if PublicKey(group_config['publicKey']) == mango_account.group][0]
 
-        group = await Group.fetch(provider.connection, PublicKey(group_config['publicKey']))
+        # group = await Group.fetch(provider.connection, PublicKey(group_config['publicKey']))
 
         perp_market_configs = [
             perp_market_config for perp_market_config in group_config['perpMarkets'] if perp_market_config['active']
@@ -121,18 +125,6 @@ class MangoClient():
             serum_market_config for serum_market_config in group_config['serum3Markets'] if serum_market_config['active']
         ]
 
-        serum_markets = await Serum3Market.fetch_multiple(
-            provider.connection,
-            [
-                PublicKey(serum3_market_config['publicKey']) for serum3_market_config in serum_market_configs
-            ]
-        )
-
-        serum_markets_external = await asyncio.gather(*[
-            AsyncMarket.load(provider.connection, serum_market.serum_market_external, SERUM_PROGRAM_ID)
-            for serum_market in serum_markets
-        ])
-
         banks_config = [
             {
                 'tokenIndex': token_config['tokenIndex'],
@@ -141,11 +133,6 @@ class MangoClient():
             for token_config in group_config['tokens']
             if token_config['active']
         ]
-
-        banks = await Bank.fetch_multiple(
-            provider.connection,
-            [bank_config['publicKey'] for bank_config in banks_config]
-        )
 
         mint_infos_configs = [
             {
@@ -159,15 +146,32 @@ class MangoClient():
 
         mint_infos_configs = list(sorted(mint_infos_configs, key=lambda mint_info_config: mint_info_config['tokenIndex']))
 
-        mint_infos = await MintInfo.fetch_multiple(
+        serum_markets = await Serum3Market.fetch_multiple(
             provider.connection,
-            [mint_info_config['publicKey'] for mint_info_config in mint_infos_configs]
+            [
+                PublicKey(serum3_market_config['publicKey']) for serum3_market_config in serum_market_configs
+            ]
         )
 
-        perp_markets = await PerpMarket.fetch_multiple(
-            provider.connection,
-            [perp_market_config['publicKey'] for perp_market_config in perp_market_configs]
-        )
+        serum_markets_external = await asyncio.gather(*[
+            AsyncMarket.load(provider.connection, serum_market.serum_market_external, SERUM_PROGRAM_ID)
+            for serum_market in serum_markets
+        ])
+
+        banks, mint_infos, perp_markets = await asyncio.gather(*[
+            Bank.fetch_multiple(
+                provider.connection,
+                [bank_config['publicKey'] for bank_config in banks_config]
+            ),
+            MintInfo.fetch_multiple(
+                provider.connection,
+                [mint_info_config['publicKey'] for mint_info_config in mint_infos_configs]
+            ),
+            PerpMarket.fetch_multiple(
+                provider.connection,
+                [perp_market_config['publicKey'] for perp_market_config in perp_market_configs]
+            )
+        ])
 
         return MangoClient(
             provider=provider,
@@ -182,7 +186,7 @@ class MangoClient():
             mint_infos=mint_infos,
             perp_markets=perp_markets,
             rpc_url=rpc_url,
-            group=group
+            # group=group
         )
 
     def symbols(self):
@@ -982,7 +986,8 @@ class MangoClient():
         return response
 
     async def funding_rate(self, symbol: str):
-        # TODO: Maybe fetch the perp market alongside the other data, just so that it's always within the same slot
+        # TODO: Fetch the perp market alongside the other data, just so that it's always within the same slot
+
         perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
         perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
@@ -1122,3 +1127,85 @@ class MangoClient():
                             }
 
                             lead = fills[-1:][0].seq_num
+
+    async def equity(self):
+        oracle_price_by_token_index = {}
+
+        oracle_price_by_oracle_pk = {}
+
+        for bank, raw_oracle in zip(
+            self.banks,
+            await asyncio.gather(*[self.provider.connection.get_account_info(bank.oracle) for bank in self.banks])
+        ):
+            name = bytes(bank.name).decode().strip('\x00')
+
+            if name == 'USDC':
+                oracle_price = 1
+            else:
+                # TODO: Handle MNGO's oracle (not Pyth)
+
+                oracle = pyth.PRICE.parse(raw_oracle.value.data)
+
+                oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
+
+            oracle_price_by_token_index[bank.token_index] = oracle_price
+
+            oracle_price_by_oracle_pk[bank.oracle] = oracle_price
+
+        balance_by_token_index = {}
+
+        for token, bank in [
+            (
+                token,
+                [bank for bank in self.banks if bank.token_index == token.token_index][0]
+            )
+            for token in filter(token_position_utils.is_active, self.mango_account.tokens)
+        ]:
+            balance_by_token_index[token.token_index] = Decimal(str(token_position_utils.balance(token, bank))) * oracle_price_by_token_index[token.token_index]
+
+        active_open_orders = [open_orders for open_orders in self.mango_account.serum3 if serum3_utils.is_active(open_orders)]
+
+        for open_orders, open_orders_external in zip(
+            active_open_orders,
+            await asyncio.gather(*[
+                AsyncOpenOrdersAccount.load(self.provider.connection, str(open_orders.open_orders))
+                for open_orders
+                in active_open_orders
+            ])
+        ):
+            # TODO: Account for referrerRebatesAccrued - this isn't available yet in pyserum
+
+            balance_by_token_index[open_orders.base_token_index] += open_orders_external.base_token_total * oracle_price_by_token_index[open_orders.base_token_index]
+
+        token_equity = sum(balance_by_token_index.values())
+
+        perp_equity = sum([
+            perp_utils.equity(perp_position, perp_market, oracle_price_by_oracle_pk[perp_market.oracle])
+            for perp_position, perp_market in [
+                (
+                    perp_position,
+                    [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_position.market_index][0]
+                )
+                for perp_position in self.mango_account.perps
+                if perp_utils.is_active(perp_position)
+            ]
+        ])
+
+        return token_equity + perp_equity
+
+        # open_orders_by_market_index = {
+        #     serum3.market_index: serum3.open_orders
+        #     for serum3 in filter(serum3_utils.is_active, self.mango_account.serum3)
+        # }
+        #
+        # open_orders_by_market_index = dict(
+        #     zip(
+        #         open_orders_by_market_index.keys(),
+        #         await asyncio.gather(*[AsyncOpenOrdersAccount.load(self.provider.connection, value) for value in open_orders_by_market_index.values()])
+        #     )
+        # )
+        #
+        # for market_index, open_orders in open_orders_by_market_index.items():
+        #     print(market_index, open_orders)
+        #
+        #     self.banks
