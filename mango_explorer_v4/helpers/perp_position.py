@@ -4,6 +4,7 @@ from mango_explorer_v4.helpers.perp_market import PerpMarketHelper
 from decimal import Decimal
 from dataclasses import dataclass
 
+
 @dataclass
 class PerpPositionHelper():
     @staticmethod
@@ -21,7 +22,7 @@ class PerpPositionHelper():
 
         taker_quote = perp_position.taker_quote_lots * perp_market.quote_lot_size
 
-        quote_current = perp_position.quote_position_native.to_decimal() - unsettled_funding(perp_position, perp_market) + taker_quote
+        quote_current = perp_position.quote_position_native.to_decimal() - PerpPositionHelper.unsettled_funding(perp_position, perp_market) + taker_quote
 
         return base_lots * base_lots_to_quote_currency_converter + quote_current
 
@@ -50,7 +51,12 @@ class PerpPositionHelper():
         if perp_position.market_index != perp_market.perp_market_index:
             raise ValueError(f"Perp position does not belong to perp market")
 
-        return perp_position.quote_position_native.to_decimal() + 0 * oracle_price
+        return (
+            perp_position.quote_position_native.to_decimal()
+            + Decimal(PerpPositionHelper.base_position_native(perp_position, perp_market))
+            * Decimal(oracle_price) * Decimal(10 ** (6 - perp_market.base_decimals))
+            # ^ 6 is the number of decimals for the insurance mint TODO: change this when that does
+        ) / Decimal(1e6)
 
     @staticmethod
     def base_position_native(
@@ -69,5 +75,3 @@ class PerpPositionHelper():
             if use_event_queue
             else perp_position.base_position_lots
         )
-
-

@@ -1129,9 +1129,9 @@ class MangoClient():
                             lead = fills[-1:][0].seq_num
 
     async def equity(self):
-        oracle_ui_price_by_token_index = {}
+        oracle_price_by_token_index = {}
 
-        oracle_ui_price_by_oracle_pk = {}
+        oracle_price_by_oracle_pk = {}
 
         for bank, raw_oracle in zip(
             self.banks,
@@ -1148,9 +1148,9 @@ class MangoClient():
 
                 oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
 
-            oracle_ui_price_by_token_index[bank.token_index] = oracle_price
+            oracle_price_by_token_index[bank.token_index] = oracle_price
 
-            oracle_ui_price_by_oracle_pk[bank.oracle] = oracle_price
+            oracle_price_by_oracle_pk[bank.oracle] = oracle_price
 
         balance_by_token_index = {}
 
@@ -1161,7 +1161,7 @@ class MangoClient():
             )
             for token in filter(token_position_utils.is_active, self.mango_account.tokens)
         ]:
-            oracle_ui_price = oracle_ui_price_by_token_index[token.token_index]
+            oracle_ui_price = oracle_price_by_token_index[token.token_index]
 
             balance_by_token_index[token.token_index] = Decimal(str(token_position_utils.balance(token, bank))) * oracle_ui_price
 
@@ -1177,12 +1177,12 @@ class MangoClient():
         ):
             # TODO: Account for referrerRebatesAccrued - this isn't available yet in pyserum
 
-            balance_by_token_index[open_orders.base_token_index] += open_orders_external.base_token_total * oracle_ui_price_by_token_index[open_orders.base_token_index]
+            balance_by_token_index[open_orders.base_token_index] += open_orders_external.base_token_total * oracle_price_by_token_index[open_orders.base_token_index]
 
         token_equity = sum(balance_by_token_index.values())
 
         perp_equity = sum([
-            PerpPositionHelper.equity(perp_position, perp_market, oracle_ui_price_by_oracle_pk[perp_market.oracle])
+            PerpPositionHelper.equity(perp_position, perp_market, oracle_price_by_oracle_pk[perp_market.oracle])
             for perp_position, perp_market in [
                 (
                     perp_position,
