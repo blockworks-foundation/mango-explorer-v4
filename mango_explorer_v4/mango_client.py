@@ -1,25 +1,19 @@
 import asyncio
-import itertools
-import sys
 import json
 import logging
 import pathlib
 import re
+import sys
 import time
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Literal, Any
+from typing import Literal
 
 import aiostream.stream
-
-from .constants import RUST_U64_MAX, RUST_I64_MAX, QUOTE_DECIMALS, SERUM_PROGRAM_ID
-from .oracles import pyth
-from .constructs.book_side_items import BookSideItems
-
 import base58
 from anchorpy import Provider, Wallet
-from pyserum.market import AsyncMarket, OrderBook
 from pyserum.async_open_orders_account import AsyncOpenOrdersAccount
+from pyserum.market import AsyncMarket, OrderBook
 from solana.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
@@ -27,34 +21,42 @@ from solana.rpc.commitment import Processed
 from solana.rpc.websocket_api import connect
 from solana.transaction import AccountMeta, Transaction
 from solders.rpc.responses import AccountNotification
+from solders.account import Account
 
-
-from mango_explorer_v4.program_id import PROGRAM_ID as MANGO_PROGRAM_ID
-from mango_explorer_v4.types.side import Bid, Ask
-from mango_explorer_v4.types.place_order_type import Limit
-from mango_explorer_v4.types.any_event import AnyEvent
-from mango_explorer_v4.types.out_event import OutEvent
-from mango_explorer_v4.types.fill_event import FillEvent
-from mango_explorer_v4.accounts.event_queue import EventQueue
 from mango_explorer_v4.accounts.bank import Bank
-from mango_explorer_v4.accounts.group import Group
 from mango_explorer_v4.accounts.book_side import BookSide
+from mango_explorer_v4.accounts.event_queue import EventQueue
 from mango_explorer_v4.accounts.mango_account import MangoAccount
 from mango_explorer_v4.accounts.mint_info import MintInfo
-from mango_explorer_v4.accounts.serum3_market import Serum3Market
 from mango_explorer_v4.accounts.perp_market import PerpMarket
+from mango_explorer_v4.accounts.serum3_market import Serum3Market
+from mango_explorer_v4.helpers.serum3_orders import Serum3OrdersHelper
+from mango_explorer_v4.helpers.token_position import TokenPositionHelper
+from mango_explorer_v4.helpers.perp_market import PerpMarketHelper
+from mango_explorer_v4.helpers.perp_position import PerpPositionHelper
+from mango_explorer_v4.helpers.bank import BankHelper
+from mango_explorer_v4.helpers.prices import PricesHelper
+from mango_explorer_v4.helpers.mango_account import MangoAccountHelper
+from mango_explorer_v4.instructions.perp_cancel_all_orders import PerpCancelAllOrdersArgs, PerpCancelAllOrdersAccounts, perp_cancel_all_orders
+from mango_explorer_v4.instructions.perp_place_order import PerpPlaceOrderArgs, PerpPlaceOrderAccounts, perp_place_order
+from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrderPeggedArgs, PerpPlaceOrderPeggedAccounts, perp_place_order_pegged
 from mango_explorer_v4.instructions.serum3_cancel_all_orders import Serum3CancelAllOrdersAccounts, Serum3CancelAllOrdersArgs, serum3_cancel_all_orders
 from mango_explorer_v4.instructions.serum3_create_open_orders import Serum3CreateOpenOrdersAccounts, serum3_create_open_orders
 from mango_explorer_v4.instructions.serum3_place_order import Serum3PlaceOrderArgs, Serum3PlaceOrderAccounts, serum3_place_order
-from mango_explorer_v4.instructions.perp_place_order import PerpPlaceOrderArgs, PerpPlaceOrderAccounts, perp_place_order
-from mango_explorer_v4.instructions.perp_cancel_all_orders import PerpCancelAllOrdersArgs, PerpCancelAllOrdersAccounts, perp_cancel_all_orders
-from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrderPeggedArgs, PerpPlaceOrderPeggedAccounts, perp_place_order_pegged
-from mango_explorer_v4.types import serum3_side, serum3_self_trade_behavior, serum3_order_type
+from mango_explorer_v4.program_id import PROGRAM_ID as MANGO_PROGRAM_ID
 from mango_explorer_v4.types import place_order_type
-from mango_explorer_v4.helpers import token_position as token_position_utils
-from mango_explorer_v4.helpers import serum3 as serum3_utils
-from mango_explorer_v4.helpers.perp_market import PerpMarketHelper
-from mango_explorer_v4.helpers.perp_position import PerpPositionHelper
+from mango_explorer_v4.types import serum3_side, serum3_self_trade_behavior, serum3_order_type
+from mango_explorer_v4.types.fill_event import FillEvent
+from mango_explorer_v4.types.place_order_type import Limit
+from mango_explorer_v4.types.side import Bid, Ask
+from mango_explorer_v4.types.token_info import TokenInfo
+from mango_explorer_v4.types.prices import Prices
+from mango_explorer_v4.types.i80f48 import I80F48
+from mango_explorer_v4.types.health_type import Init
+from mango_explorer_v4.types.serum3_info import Serum3Info
+from .constants import RUST_I64_MAX, QUOTE_DECIMALS, SERUM_PROGRAM_ID
+from .constructs.book_side_items import BookSideItems
+from .oracles import pyth
 
 logging.basicConfig(
     level=logging.INFO
@@ -1159,13 +1161,13 @@ class MangoClient():
                 token,
                 [bank for bank in self.banks if bank.token_index == token.token_index][0]
             )
-            for token in filter(token_position_utils.is_active, self.mango_account.tokens)
+            for token in filter(TokenPositionHelper.is_active, self.mango_account.tokens)
         ]:
-            oracle_ui_price = oracle_price_by_token_index[token.token_index]
+            oracle_price = oracle_price_by_token_index[token.token_index]
 
-            balance_by_token_index[token.token_index] = Decimal(str(token_position_utils.balance(token, bank))) * oracle_ui_price
+            balance_by_token_index[token.token_index] = Decimal(str(TokenPositionHelper.balance(token, bank))) * oracle_price
 
-        active_open_orders = [open_orders for open_orders in self.mango_account.serum3 if serum3_utils.is_active(open_orders)]
+        active_open_orders = [open_orders for open_orders in self.mango_account.serum3 if Serum3OrdersHelper.is_active(open_orders)]
 
         for open_orders, open_orders_external in zip(
             active_open_orders,
@@ -1195,5 +1197,102 @@ class MangoClient():
 
         return token_equity + perp_equity
 
-    async def base_position_size(self, symbol: str):
-        pass
+    async def health_ratio(self):
+        # Build the health cache
+
+        token_positions = [
+            token_position
+            for token_position in self.mango_account.tokens
+            if token_position.token_index != 65535
+        ]
+
+        banks = [
+            [bank for bank in self.banks if bank.token_index == token_position.token_index][0]
+            for token_position in token_positions
+        ]
+
+        raw_oracles = await self.provider.connection.get_multiple_accounts([bank.oracle for bank in banks])
+
+        def oracle_price_from_account_info(account: Account):
+            match str(account.owner):
+                case 'FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH': # Pyth
+                    oracle = pyth.PRICE.parse(account.data)
+
+                    return oracle.agg.price * (Decimal(10) ** oracle.expo)
+                case '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg': # For now it's always USDC
+                    return Decimal(1)
+
+        oracle_prices = [
+            oracle_price_from_account_info(account)
+            for account in raw_oracles.value
+        ]
+
+        token_infos = [
+            TokenInfo(
+                bank.token_index,
+                bank.maint_asset_weight,
+                bank.init_asset_weight,
+                BankHelper.scaled_init_asset_weight(bank, PricesHelper.liability(prices, Init())),
+                bank.maint_liab_weight,
+                bank.init_liab_weight,
+                BankHelper.scaled_init_liab_weight(bank, PricesHelper.liability(prices, Init())),
+                prices,
+                TokenPositionHelper.balance(token_position, bank)
+            )
+            for bank, token_position, prices
+            in zip(
+                banks,
+                token_positions,
+                [
+                    Prices(
+                        oracle=I80F48.from_decimal(oracle_price * Decimal(10 ** (6 - bank.mint_decimals))),
+                        stable=I80F48.from_decimal(Decimal(bank.stable_price_model.stable_price))
+                    )
+                    for bank, oracle_price in zip(banks, oracle_prices)
+                ]
+            )
+        ]
+
+        serum3_infos = []
+
+        for open_orders, open_orders_external in zip(
+                MangoAccountHelper.active_serum3_orders(self.mango_account),
+                await asyncio.gather(*[
+                    AsyncOpenOrdersAccount.load(self.provider.connection, str(open_orders.open_orders))
+                    for open_orders
+                    in MangoAccountHelper.active_serum3_orders(self.mango_account)
+                ])
+        ):
+            base_index, base_info = [
+                (index, token_info)
+                for index, token_info in enumerate(token_infos)
+                if token_info.token_index == open_orders.base_token_index
+            ][0]
+
+            if not base_info:
+                raise ValueError(f"Base token info not found for market index {open_orders.market_index}")
+
+            quote_index, quote_info = [
+                (index, token_info)
+                for index, token_info in enumerate(token_infos)
+                if token_info.token_index == open_orders.quote_token_index
+            ][0]
+
+            if not quote_info:
+                raise ValueError(f"Quote token info not found for market index {open_orders.market_index}")
+
+            reserved_base = open_orders_external.base_token_total - open_orders_external.base_token_free
+
+            reserved_quote = open_orders_external.quote_token_total - open_orders_external.quote_token_free
+
+            serum3_infos.append(
+                Serum3Info(
+                    reserved_base=I80F48.from_decimal(Decimal(reserved_base)),
+                    reserved_quote=I80F48.from_decimal(Decimal(reserved_quote)),
+                    base_index=base_index,
+                    quote_index=quote_index,
+                    market_index=open_orders.market_index,
+                    has_zero_funds=False
+                )
+            )
+
