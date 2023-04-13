@@ -75,3 +75,22 @@ class PerpPositionHelper():
             if use_event_queue
             else perp_position.base_position_lots
         )
+
+    @staticmethod
+    def has_open_orders(perp_position: PerpPosition):
+        return any([
+            value != 0
+            for value in [
+                perp_position.asks_base_lots,
+                perp_position.bids_base_lots,
+                perp_position.taker_base_lots,
+                perp_position.taker_quote_lots
+            ]
+        ])
+
+    @staticmethod
+    def has_open_fills(perp_position: PerpPosition):
+        return perp_position.taker_base_lots != 0 or perp_position.taker_quote_lots != 0
+
+
+

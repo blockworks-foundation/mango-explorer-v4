@@ -50,10 +50,12 @@ from mango_explorer_v4.types.fill_event import FillEvent
 from mango_explorer_v4.types.place_order_type import Limit
 from mango_explorer_v4.types.side import Bid, Ask
 from mango_explorer_v4.types.token_info import TokenInfo
+from mango_explorer_v4.types.perp_info import PerpInfo
 from mango_explorer_v4.types.prices import Prices
 from mango_explorer_v4.types.i80f48 import I80F48
 from mango_explorer_v4.types.health_type import Init
 from mango_explorer_v4.types.serum3_info import Serum3Info
+from mango_explorer_v4.types.health_cache import HealthCache
 from .constants import RUST_I64_MAX, QUOTE_DECIMALS, SERUM_PROGRAM_ID
 from .constructs.book_side_items import BookSideItems
 from .oracles import pyth
@@ -1295,4 +1297,66 @@ class MangoClient():
                     has_zero_funds=False
                 )
             )
+
+        perp_positions = MangoAccountHelper.active_perp_positions(self.mango_account)
+
+        perp_markets = [
+            [
+                perp_market
+                for perp_market in self.perp_markets
+                if perp_market.perp_market_index == perp_position.market_index
+            ][0]
+            for perp_position in perp_positions
+
+        ]
+
+        perp_market_oracle_prices = [
+            oracle_price_from_account_info(raw_oracle)
+            for raw_oracle in (await self.provider.connection.get_multiple_accounts([perp_market.oracle for perp_market in perp_markets])).value
+        ]
+
+        perp_infos = []
+
+        for perp_position, perp_market, perp_market_oracle_price in zip(
+            perp_positions,
+            perp_markets,
+            perp_market_oracle_prices
+        ):
+            base_lots = perp_position.base_position_lots + perp_position.taker_base_lots
+
+            unsettled_funding = PerpPositionHelper.unsettled_funding(perp_position, perp_market)
+
+            taker_quote = perp_position.taker_quote_lots * perp_market.quote_lot_size
+
+            quote_current = perp_position.quote_position_native.to_decimal() - unsettled_funding + Decimal(taker_quote)
+
+            perp_info = PerpInfo(
+                perp_market.perp_market_index,
+                perp_market.maint_base_asset_weight,
+                perp_market.init_base_asset_weight,
+                perp_market.maint_base_liab_weight,
+                perp_market.init_base_liab_weight,
+                perp_market.maint_overall_asset_weight,
+                perp_market.init_overall_asset_weight,
+                perp_market.base_lot_size,
+                base_lots,
+                perp_position.bids_base_lots,
+                perp_position.asks_base_lots,
+                quote_current,
+                Prices(
+                    oracle=I80F48.from_decimal(perp_market_oracle_price * Decimal(10 ** (6 - perp_market.base_decimals))),
+                    stable=I80F48.from_decimal(Decimal(perp_market.stable_price_model.stable_price))
+                ),
+                PerpPositionHelper.has_open_orders(perp_position),
+                PerpPositionHelper.has_open_fills(perp_position)
+            )
+
+            perp_infos.append(perp_info)
+
+        health_cache = HealthCache(
+            token_infos,
+            serum3_infos,
+            perp_infos,
+            False
+        )
 
