@@ -1,0 +1,7 @@
+MangoClient:
+    - fills (& incremental)
+    - orderbook_l2 (& incremental)
+    - funding rate
+
+MangoAccount:
+    - order management

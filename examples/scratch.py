@@ -34,7 +34,9 @@ async def main():
     oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
 
     print({
-        'health_ratio': await mango_client.health_ratio(),
+        'init_health_ratio': await mango_client.health_ratio('init'),
+        'maint_health_ratio': await mango_client.health_ratio('maint'),
+        'liquidation_end_health_ratio': await mango_client.health_ratio('liquidation_end'),
         'maintenance_health': None,
         'base_position': PerpPositionHelper.base_position_ui(perp_position, perp_market),
         'quote_position': Decimal(PerpPositionHelper.base_position_ui(perp_position, perp_market)) * oracle_price,

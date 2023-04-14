@@ -37,6 +37,7 @@ from mango_explorer_v4.helpers.perp_position import PerpPositionHelper
 from mango_explorer_v4.helpers.bank import BankHelper
 from mango_explorer_v4.helpers.prices import PricesHelper
 from mango_explorer_v4.helpers.mango_account import MangoAccountHelper
+from mango_explorer_v4.helpers.token_info import TokenInfoHelper
 from mango_explorer_v4.instructions.perp_cancel_all_orders import PerpCancelAllOrdersArgs, PerpCancelAllOrdersAccounts, perp_cancel_all_orders
 from mango_explorer_v4.instructions.perp_place_order import PerpPlaceOrderArgs, PerpPlaceOrderAccounts, perp_place_order
 from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrderPeggedArgs, PerpPlaceOrderPeggedAccounts, perp_place_order_pegged
@@ -53,9 +54,10 @@ from mango_explorer_v4.types.token_info import TokenInfo
 from mango_explorer_v4.types.perp_info import PerpInfo
 from mango_explorer_v4.types.prices import Prices
 from mango_explorer_v4.types.i80f48 import I80F48
-from mango_explorer_v4.types.health_type import Init
+from mango_explorer_v4.types.health_type import Init, Maint, LiquidationEnd
 from mango_explorer_v4.types.serum3_info import Serum3Info
 from mango_explorer_v4.types.health_cache import HealthCache
+from mango_explorer_v4.types.health_type import HealthTypeKind
 from .constants import RUST_I64_MAX, QUOTE_DECIMALS, SERUM_PROGRAM_ID
 from .constructs.book_side_items import BookSideItems
 from .oracles import pyth
@@ -1199,7 +1201,13 @@ class MangoClient():
 
         return token_equity + perp_equity
 
-    async def health_ratio(self):
+    async def health_ratio(self, health_type: Literal['init', 'maint', 'liquidation_end']):
+        health_type: HealthTypeKind = {
+            'init': Init(),
+            'maint': Maint(),
+            'liquidation_end': LiquidationEnd()
+        }[health_type]
+
         # Build the health cache
 
         token_positions = [
@@ -1239,7 +1247,7 @@ class MangoClient():
                 bank.init_liab_weight,
                 BankHelper.scaled_init_liab_weight(bank, PricesHelper.liability(prices, Init())),
                 prices,
-                TokenPositionHelper.balance(token_position, bank)
+                I80F48.from_decimal(TokenPositionHelper.balance(token_position, bank))
             )
             for bank, token_position, prices
             in zip(
@@ -1360,3 +1368,9 @@ class MangoClient():
             False
         )
 
+        assets = 0
+
+        liabs = 0
+
+        for token_info in health_cache.token_infos:
+            contrib = TokenInfoHelper.health_contribution(token_info, health_type)

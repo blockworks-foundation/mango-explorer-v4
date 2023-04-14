@@ -9,7 +9,7 @@ class TokenPositionHelper():
         return token_position.token_index != 65535
 
     @staticmethod
-    def balance(token_position: TokenPosition, bank: Bank):
+    def balance(token_position: TokenPosition, bank: Bank) -> Decimal:
         token_position = token_position.indexed_position.to_decimal()
 
         bank_index = bank.deposit_index if token_position > 0 else bank.borrow_index
