@@ -39,6 +39,7 @@ from mango_explorer_v4.helpers.prices import PricesHelper
 from mango_explorer_v4.helpers.mango_account import MangoAccountHelper
 from mango_explorer_v4.helpers.token_info import TokenInfoHelper
 from mango_explorer_v4.helpers.serum3_info import Serum3InfoHelper
+from mango_explorer_v4.helpers.perp_info import PerpInfoHelper
 from mango_explorer_v4.instructions.perp_cancel_all_orders import PerpCancelAllOrdersArgs, PerpCancelAllOrdersAccounts, perp_cancel_all_orders
 from mango_explorer_v4.instructions.perp_place_order import PerpPlaceOrderArgs, PerpPlaceOrderAccounts, perp_place_order
 from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrderPeggedArgs, PerpPlaceOrderPeggedAccounts, perp_place_order_pegged
@@ -1338,7 +1339,7 @@ class MangoClient():
 
             taker_quote = perp_position.taker_quote_lots * perp_market.quote_lot_size
 
-            quote_current = perp_position.quote_position_native.to_decimal() - unsettled_funding + Decimal(taker_quote)
+            quote_current = I80F48.from_decimal(perp_position.quote_position_native.to_decimal() - unsettled_funding + Decimal(taker_quote))
 
             perp_info = PerpInfo(
                 perp_market.perp_market_index,
@@ -1418,7 +1419,13 @@ class MangoClient():
         res = get_serum3_reservations(Maint())
 
         for index, serum3_info in enumerate(serum3_infos):
-            contrib = Serum3InfoHelper.health_contribution(serum3_info, health_type, health_cache.token_infos, res['token_max_reserved'], res['serum3_reserved'][index]).to_decimal()
+            contrib = Serum3InfoHelper.health_contribution(
+                serum3_info,
+                health_type,
+                health_cache.token_infos,
+                res['token_max_reserved'],
+                res['serum3_reserved'][index]
+            ).to_decimal()
 
             if contrib > 0:
                 assets += contrib
@@ -1426,4 +1433,14 @@ class MangoClient():
                 liabs -= contrib
 
         for perp_info in health_cache.perp_infos:
-            contrib =
+            contrib = PerpInfoHelper.health_contribution(perp_info, health_type).to_decimal()
+
+            if contrib > 0:
+                assets += contrib
+            else:
+                liabs -= contrib
+
+        if liabs > 0.001:
+            return 100 * (assets - liabs) / liabs
+        else:
+            return sys.maxsize

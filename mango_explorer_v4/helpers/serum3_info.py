@@ -5,6 +5,7 @@ from mango_explorer_v4.types.serum3_info import Serum3Info
 from mango_explorer_v4.helpers.token_info import TokenInfoHelper
 from mango_explorer_v4.helpers.prices import PricesHelper
 from mango_explorer_v4.constructs.serum3_reserved import Serum3Reserved
+from decimal import Decimal
 
 class Serum3InfoHelper:
     @staticmethod
@@ -19,7 +20,7 @@ class Serum3InfoHelper:
             market_reserved.all_reserved_as_base == 0,
             market_reserved.all_reserved_as_quote == 0
         ]):
-            return 0
+            return I80F48.from_decimal(Decimal(0))
 
         base_info, quote_info = token_infos[serum3_info.base_index], token_infos[serum3_info.quote_index]
 
@@ -53,9 +54,9 @@ class Serum3InfoHelper:
 
             return I80F48.from_decimal(asset_weight * asset_part * asset_price + liab_weight * liab_part * liab_price)
 
-        health_base = get_health_effect(base_info, base_max_reserved, market_reserved.all_reserved_as_base)
+        health_base = get_health_effect(base_info, base_max_reserved, I80F48.from_decimal(market_reserved.all_reserved_as_base))
 
-        health_quote = get_health_effect(quote_info, quote_max_reserved, market_reserved.all_reserved_as_quote)
+        health_quote = get_health_effect(quote_info, quote_max_reserved, I80F48.from_decimal(market_reserved.all_reserved_as_quote))
 
         return I80F48.from_decimal(min(health_base.to_decimal(), health_quote.to_decimal()))
 
