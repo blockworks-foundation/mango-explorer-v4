@@ -6,7 +6,7 @@ from mango_explorer_v4.types.health_type import HealthTypeKind, Maint, Liquidati
 
 class PricesHelper:
     @staticmethod
-    def liability(prices: Prices, health_type: HealthTypeKind) -> decimal.Decimal:
+    def liab(prices: Prices, health_type: HealthTypeKind) -> decimal.Decimal:
         if health_type in [Maint, LiquidationEnd] or health_type is None:
             return prices.oracle.to_decimal()
         else:

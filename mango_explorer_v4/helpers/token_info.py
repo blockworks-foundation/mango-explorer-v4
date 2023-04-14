@@ -29,7 +29,7 @@ class TokenInfoHelper():
             return token_info.balance_native.to_decimal() * token_info.prices.oracle.to_decimal()
 
         if token_info.balance_native.to_decimal() < 0:
-            weight, price = TokenInfoHelper.liab_weight(token_info, health_type), PricesHelper.liability(token_info.prices, health_type)
+            weight, price = TokenInfoHelper.liab_weight(token_info, health_type), PricesHelper.liab(token_info.prices, health_type)
         else:
             weight, price = TokenInfoHelper.asset_weight(token_info, health_type), PricesHelper.asset(token_info.prices, health_type)
 

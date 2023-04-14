@@ -38,6 +38,7 @@ from mango_explorer_v4.helpers.bank import BankHelper
 from mango_explorer_v4.helpers.prices import PricesHelper
 from mango_explorer_v4.helpers.mango_account import MangoAccountHelper
 from mango_explorer_v4.helpers.token_info import TokenInfoHelper
+from mango_explorer_v4.helpers.serum3_info import Serum3InfoHelper
 from mango_explorer_v4.instructions.perp_cancel_all_orders import PerpCancelAllOrdersArgs, PerpCancelAllOrdersAccounts, perp_cancel_all_orders
 from mango_explorer_v4.instructions.perp_place_order import PerpPlaceOrderArgs, PerpPlaceOrderAccounts, perp_place_order
 from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrderPeggedArgs, PerpPlaceOrderPeggedAccounts, perp_place_order_pegged
@@ -60,6 +61,7 @@ from mango_explorer_v4.types.health_cache import HealthCache
 from mango_explorer_v4.types.health_type import HealthTypeKind
 from .constants import RUST_I64_MAX, QUOTE_DECIMALS, SERUM_PROGRAM_ID
 from .constructs.book_side_items import BookSideItems
+from .constructs.serum3_reserved import Serum3Reserved
 from .oracles import pyth
 
 logging.basicConfig(
@@ -1242,10 +1244,10 @@ class MangoClient():
                 bank.token_index,
                 bank.maint_asset_weight,
                 bank.init_asset_weight,
-                BankHelper.scaled_init_asset_weight(bank, PricesHelper.liability(prices, Init())),
+                BankHelper.scaled_init_asset_weight(bank, PricesHelper.liab(prices, Init())),
                 bank.maint_liab_weight,
                 bank.init_liab_weight,
-                BankHelper.scaled_init_liab_weight(bank, PricesHelper.liability(prices, Init())),
+                BankHelper.scaled_init_liab_weight(bank, PricesHelper.liab(prices, Init())),
                 prices,
                 I80F48.from_decimal(TokenPositionHelper.balance(token_position, bank))
             )
@@ -1374,3 +1376,54 @@ class MangoClient():
 
         for token_info in health_cache.token_infos:
             contrib = TokenInfoHelper.health_contribution(token_info, health_type)
+
+            if contrib > 0:
+                assets += contrib
+            else:
+                liabs -= contrib
+
+        def get_serum3_reservations(health_type: HealthTypeKind):
+            token_max_reserved = [0 for _ in range(0, len(token_infos))]
+
+            serum3_reserved: [Serum3Reserved] = []
+
+            for serum3_info in serum3_infos:
+                quote, base = token_infos[serum3_info.quote_index], token_infos[serum3_info.base_index]
+
+                reserved_base, reserved_quote = serum3_info.reserved_base.to_decimal(), serum3_info.reserved_quote.to_decimal()
+
+                quote_asset = PricesHelper.asset(quote.prices, health_type)
+
+                base_liab = PricesHelper.liab(base.prices, health_type)
+
+                all_reserved_as_base = reserved_base + reserved_quote * quote_asset / base_liab
+
+                base_asset = PricesHelper.asset(base.prices, health_type)
+
+                quote_liab = PricesHelper.liab(quote.prices, health_type)
+
+                all_reserved_as_quote = reserved_quote + reserved_base * base_asset / quote_liab
+
+                token_max_reserved[serum3_info.base_index] += all_reserved_as_base
+
+                token_max_reserved[serum3_info.quote_index] += all_reserved_as_quote
+
+                serum3_reserved.append(Serum3Reserved(all_reserved_as_base, all_reserved_as_quote))
+
+            return {
+                'token_max_reserved': token_max_reserved,
+                'serum3_reserved': serum3_reserved
+            }
+
+        res = get_serum3_reservations(Maint())
+
+        for index, serum3_info in enumerate(serum3_infos):
+            contrib = Serum3InfoHelper.health_contribution(serum3_info, health_type, health_cache.token_infos, res['token_max_reserved'], res['serum3_reserved'][index]).to_decimal()
+
+            if contrib > 0:
+                assets += contrib
+            else:
+                liabs -= contrib
+
+        for perp_info in health_cache.perp_infos:
+            contrib =
