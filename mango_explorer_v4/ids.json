@@ -236,6 +236,17 @@
         },
         {
           "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
+          "publicKey": "Cq3Hs8WYcVHfvvnz1nv8MnAfZJGBrgj1PAhLtxYZwEBJ",
+          "marketIndex": 6,
+          "name": "MNGO/USDC",
+          "baseTokenIndex": 6,
+          "quoteTokenIndex": 0,
+          "serumProgram": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+          "serumMarketExternal": "3NnxQvDcZXputNMxaxsGvqiKpqgPfSYXpNigZNFcknmD",
+          "active": true
+        },
+        {
+          "group": "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX",
           "publicKey": "6M7Zrd9UtWc8bhfa6zVnsuN9QULskY6x5bPcZ543hVUQ",
           "marketIndex": 2,
           "name": "mSOL/USDC",

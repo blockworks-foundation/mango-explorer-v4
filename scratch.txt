@@ -5,3 +5,10 @@ MangoClient:
 
 MangoAccount:
     - order management
+
+
+TODO:
+- Decouple general data fetching functions from those explicitly requiring a Mango account
+- Add unsettled funds to balances
+- Add SettleFunds instruction
+- Add sequence enforcer to the example market maker
