@@ -13,6 +13,7 @@ from mango_explorer_v4.constants import RUST_U64_MAX
 from mango_explorer_v4.types.inner_node import InnerNode
 from mango_explorer_v4.types.leaf_node import LeafNode
 from mango_explorer_v4.types.order_tree_root import OrderTreeRoot
+from mango_explorer_v4.helpers.perp_market import PerpMarketHelper
 
 
 @dataclass
@@ -71,7 +72,7 @@ class BookSideItems:
 
                             price_offset = price_data - (1 << 63)
 
-                            price_lots = self.perp_market.ui_price_to_lots(self.oracle_price) + price_offset
+                            price_lots = PerpMarketHelper.ui_price_to_lots(self.perp_market, self.oracle_price) + price_offset
 
                             is_invalid = {
                                 'bids': price_lots > leaf_node.peg_limit,
@@ -81,9 +82,9 @@ class BookSideItems:
                             oracle_pegged_properties = {
                                 'is_invalid': is_invalid,
                                 'price_offset': price_offset,
-                                'ui_price_offset': self.perp_market.price_lots_to_ui(price_offset),
+                                'ui_price_offset': PerpMarketHelper.price_lots_to_ui(self.perp_market, price_offset),
                                 'peg_limit': leaf_node.peg_limit,
-                                'ui_peg_limit': self.perp_market.price_lots_to_ui(leaf_node.peg_limit),
+                                'ui_peg_limit': PerpMarketHelper.price_lots_to_ui(self.perp_market, leaf_node.peg_limit)
                             }
                         else:
                             price_lots = leaf_node.key >> 64
@@ -103,9 +104,10 @@ class BookSideItems:
                             leaf_node.owner,
                             leaf_node.owner_slot,
                             0,
-                            float(Decimal(price_lots) * Decimal(self.perp_market.price_lots_to_ui_converter)),
+                            # float(Decimal(price_lots) * Decimal(self.perp_market.price_lots_to_ui_converter)),
+                            float(PerpMarketHelper.price_lots_to_ui(self.perp_market, price_lots)),
                             price_lots,
-                            float(Decimal(leaf_node.quantity) * Decimal(self.perp_market.base_lots_to_ui_converter)),
+                            float(PerpMarketHelper.base_lots_to_ui(self.perp_market, leaf_node.quantity)),
                             leaf_node.quantity,
                             self.side,
                             leaf_node.timestamp,

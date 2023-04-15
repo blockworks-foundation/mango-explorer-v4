@@ -72,59 +72,25 @@ logging.basicConfig(
 
 @dataclass
 class MangoClient():
-    provider: Provider
-    mango_account_pk: str
+    connection: AsyncClient
     group_config: dict
-    mango_account: MangoAccount
     serum_market_configs: [dict]
     perp_market_configs: [dict]
     serum_markets: [Serum3Market]
     serum_markets_external: [AsyncMarket]
+    perp_markets: [PerpMarket]
     banks: [Bank]
     mint_infos: [MintInfo]
-    perp_markets: [PerpMarket]
-    rpc_url: str
-    # group: Group
 
     @staticmethod
-    async def connect(
-        secret_key: str | bytes,
-        # ^ Can be the output from Phantom's "Export Private Key" - this for easy onboarding
-        # as with the V3 lib folks used to get confused about how to turn it into something
-        # like the output from `solana-keygen new -o scratch.json`, which is also supported
-        mango_account_pk: str,
-        # ^ A SOL wallet can have multiple Mango accounts - let the user pick the one he's
-        # looking to use. Specifying it beforehand spares a lot of redundancy
-        rpc_url: str = 'https://mango.rpcpool.com/0f9acc0d45173b51bf7d7e09c1e5'
-        # ^ Can use the default RPC endpoint or whichever so desired
-    ):
-        # TODO: Parallelize asynchronous calls here to reduce load times - around 2 seconds right now
-        provider = Provider(
-            AsyncClient(rpc_url, Processed),
-            Wallet(
-                Keypair.from_secret_key(
-                    base58.b58decode(secret_key)
-                    if type(secret_key == str) else
-                    Wallet(Keypair.from_secret_key(secret_key))
-                )
-            )
-            if secret_key is not None else Wallet.dummy()
-        )
-
-        mango_account = await MangoAccount.fetch(
-            provider.connection,
-            PublicKey(mango_account_pk)
-        )
-
-        if mango_account.owner != provider.wallet.public_key:
-            raise ValueError('Mango account is not owned by the secret key entered')
+    async def connect(rpc_url: str = 'https://mango.rpcpool.com/0f9acc0d45173b51bf7d7e09c1e5'):
+        connection = AsyncClient(rpc_url, Processed)
 
         ids = json.loads(open(pathlib.Path(__file__).parent / 'ids.json').read())
-        # TODO: ^ Make this fetch from https://mango-transaction-log.herokuapp.com/v4/group-metadata instead
+        # TODO: ^ Make it fetch from https://api.mngo.cloud/data/v4/group-metadata instead
 
-        group_config = [group_config for group_config in ids['groups'] if PublicKey(group_config['publicKey']) == mango_account.group][0]
-
-        # group = await Group.fetch(provider.connection, PublicKey(group_config['publicKey']))
+        group_config = [group_config for group_config in ids['groups'] if group_config['publicKey'] == '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'][0]
+        # TODO: ^ Un-hardcode the group config public key (not necessary for now as there's only mainnet)
 
         perp_market_configs = [
             perp_market_config for perp_market_config in group_config['perpMarkets'] if perp_market_config['active']
@@ -134,7 +100,7 @@ class MangoClient():
             serum_market_config for serum_market_config in group_config['serum3Markets'] if serum_market_config['active']
         ]
 
-        banks_config = [
+        bank_configs = [
             {
                 'tokenIndex': token_config['tokenIndex'],
                 'publicKey': PublicKey(token_config['banks'][0]['publicKey'])
@@ -143,70 +109,62 @@ class MangoClient():
             if token_config['active']
         ]
 
-        mint_infos_configs = [
+        mint_info_configs = [
             {
                 'tokenIndex': token_config['tokenIndex'],
                 'publicKey': PublicKey(token_config['mintInfo'])
             }
             for token_config in group_config['tokens']
             if token_config['active']
-            if token_config['tokenIndex'] in [token.token_index for token in mango_account.tokens if token.token_index != 65535]
         ]
 
-        mint_infos_configs = list(sorted(mint_infos_configs, key=lambda mint_info_config: mint_info_config['tokenIndex']))
+        mint_info_configs = list(sorted(mint_info_configs, key=lambda mint_info_config: mint_info_config['tokenIndex']))
 
         serum_markets = await Serum3Market.fetch_multiple(
-            provider.connection,
+            connection,
             [
                 PublicKey(serum3_market_config['publicKey']) for serum3_market_config in serum_market_configs
             ]
         )
 
         serum_markets_external = await asyncio.gather(*[
-            AsyncMarket.load(provider.connection, serum_market.serum_market_external, SERUM_PROGRAM_ID)
+            AsyncMarket.load(connection, serum_market.serum_market_external, SERUM_PROGRAM_ID)
             for serum_market in serum_markets
         ])
 
         banks, mint_infos, perp_markets = await asyncio.gather(*[
             Bank.fetch_multiple(
-                provider.connection,
-                [bank_config['publicKey'] for bank_config in banks_config]
+                connection,
+                [bank_config['publicKey'] for bank_config in bank_configs]
             ),
             MintInfo.fetch_multiple(
-                provider.connection,
-                [mint_info_config['publicKey'] for mint_info_config in mint_infos_configs]
+                connection,
+                [mint_info_config['publicKey'] for mint_info_config in mint_info_configs]
             ),
             PerpMarket.fetch_multiple(
-                provider.connection,
+                connection,
                 [perp_market_config['publicKey'] for perp_market_config in perp_market_configs]
             )
         ])
 
         return MangoClient(
-            provider=provider,
-            mango_account_pk=mango_account_pk,
-            mango_account=mango_account,
+            connection=connection,
             group_config=group_config,
             serum_market_configs=serum_market_configs,
             perp_market_configs=perp_market_configs,
             serum_markets=serum_markets,
             serum_markets_external=serum_markets_external,
-            banks=banks,
-            mint_infos=mint_infos,
             perp_markets=perp_markets,
-            rpc_url=rpc_url,
-            # group=group
+            banks=banks,
+            mint_infos=mint_infos
         )
 
     def symbols(self):
-        # Can't make it a static / class function yet because need to know
-        # which group to use, and group is inferred from the Mango account
-
         # This might not be the best format for keeping symbols organized,
         # as it presumes that perpetual and spot market names would never
         # conflict, but it works for now
 
-        # TODO: Add minimum order size, tick size, lot size and liquidation fee
+        # TODO: Add minimum order size, tick size and liquidation fee
         return [
             *[
                 {
@@ -255,7 +213,7 @@ class MangoClient():
                     if serum_market_external.state.public_key() == serum_market.serum_market_external
                 ][0]
 
-                response = await self.provider.connection.get_multiple_accounts([
+                response = await self.connection.get_multiple_accounts([
                     serum_market_external.state.bids(),
                     serum_market_external.state.asks()
                 ])
@@ -280,7 +238,7 @@ class MangoClient():
 
                 perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
 
-                accounts = await self.provider.connection.get_multiple_accounts([perp_market.bids, perp_market.asks, perp_market.oracle])
+                accounts = await self.connection.get_multiple_accounts([perp_market.bids, perp_market.asks, perp_market.oracle])
 
                 [raw_bids, raw_asks, raw_oracle] = accounts.value
 
@@ -330,7 +288,7 @@ class MangoClient():
                 }
 
                 async def snapshots(side):
-                    async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
+                    async with connect(self.connection._provider.endpoint_uri.replace('https://', 'wss://')) as websocket:
                         await websocket.account_subscribe(getattr(serum_market_external.state, side)(), Processed, 'jsonParsed')
 
                         async for message in websocket:
@@ -346,16 +304,17 @@ class MangoClient():
                                     ).get_l2(depth)
                                 ]
 
-                                yield side, orders
+                                yield side, orders, submessage.result.context.slot
 
                 async with aiostream.stream.merge(*[stream for stream in [snapshots(side) for side in ['bids', 'asks']]]).stream() as streamer:
-                    async for side, orders in streamer:
+                    async for side, orders, slot in streamer:
                         orderbook[side] = orders
 
                         if not all([orderbook['bids'], orderbook['asks']]):
                             continue
 
                         yield orderbook
+
             case 'perpetual':
                 perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
@@ -372,7 +331,7 @@ class MangoClient():
                 }
 
                 async def oracle_price():
-                    async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
+                    async with connect(self.connection._provider.endpoint_uri.replace('https://', 'wss://')) as websocket:
                         await websocket.account_subscribe(perp_market.oracle, Processed, 'jsonParsed')
 
                         async for message in websocket:
@@ -389,7 +348,7 @@ class MangoClient():
                                 }
 
                 async def book(side):
-                    async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
+                    async with connect(self.connection._provider.endpoint_uri.replace('https://', 'wss://')) as websocket:
                         await websocket.account_subscribe(getattr(perp_market, side), Processed, 'jsonParsed')
 
                         async for message in websocket:
@@ -419,617 +378,6 @@ class MangoClient():
 
                         yield orderbook
 
-
-    def _health_remaining_accounts(
-        self,
-        retriever: Literal['fixed', 'scanning'],
-        banks: [Bank],
-        perp_markets: [PerpMarket]
-    ) -> [AccountMeta]:
-        health_remaining_account_pks = []
-
-        match retriever:
-            case 'fixed':
-                token_indices = [token.token_index for token in self.mango_account.tokens]
-
-                if len(banks) > 0:
-                    for bank in banks:
-                        if bank.token_index not in token_indices:
-                            index = [
-                                idx for idx, token in enumerate(self.mango_account.tokens)
-                                if token.token_index == 65535
-                                if token_indices[idx] == 65535
-                            ][0]
-
-                            token_indices[index] = bank.token_index
-
-                mint_infos = [
-                    mint_info for mint_info in self.mint_infos
-                    if mint_info.token_index in [token_index for token_index in token_indices if token_index != 65535]
-                ]
-
-                health_remaining_account_pks.extend([mint_info.banks[0] for mint_info in mint_infos])
-
-                health_remaining_account_pks.extend([mint_info.oracle for mint_info in mint_infos])
-
-                perp_market_indices = [perp.market_index for perp in self.mango_account.perps]
-
-                if len(perp_markets) > 0:
-                    for perp_market in perp_markets:
-                        if perp_market.perp_market_index not in perp_market_indices:
-                            index = [
-                                idx for idx, perp in enumerate(self.mango_account.perps)
-                                if perp.market_index == 65535
-                                if perp_market_indices[idx] == 65535
-                            ][0] = perp_market.perp_market_index
-
-                            perp_market_indices[index] = perp_market.perp_market_index
-
-                perp_markets = [
-                    perp_market for perp_market in self.perp_markets
-                    if perp_market.perp_market_index in [perp_index for perp_index in perp_market_indices if perp_index != 65535]
-                ]
-
-                perp_market_pks = [
-                    PublicKey(perp_market_config['publicKey']) for perp_market_config in self.group_config['perpMarkets']
-                    if perp_market_config['marketIndex'] in [perp_market.perp_market_index for perp_market in perp_markets]
-                ]
-
-                health_remaining_account_pks.extend(perp_market_pks)
-
-                health_remaining_account_pks.extend([perp_market.oracle for perp_market in perp_markets])
-
-                health_remaining_account_pks.extend([serum3.open_orders for serum3 in self.mango_account.serum3 if serum3.market_index != 65535])
-            case 'scanning':
-                raise NotImplementedError()
-
-        remaining_accounts: [AccountMeta] = [
-            AccountMeta(pubkey=remaining_account_pk, is_writable=False, is_signer=False)
-            for remaining_account_pk in health_remaining_account_pks
-        ]
-
-        return remaining_accounts
-
-    def make_serum3_place_order_ix(self, symbol: str, side: Literal['bids', 'asks'], price: float, size: float):
-        serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
-
-        serum_market_index = serum_market_config['marketIndex']
-
-        serum_market = [
-            serum_market
-            for serum_market in self.serum_markets
-            if serum_market.market_index == serum_market_index
-        ][0]
-
-        serum_market_external = [
-            serum_market_external
-            for serum_market_external in self.serum_markets_external
-            if serum_market_external.state.public_key() == serum_market.serum_market_external
-        ][0]
-
-        limit_price = serum_market_external.state.price_number_to_lots(price)
-
-        max_base_qty = serum_market_external.state.base_size_number_to_lots(size)
-
-        order_type = {'limit': serum3_order_type.Limit(), 'immediate_or_cancel': serum3_order_type.ImmediateOrCancel()}['limit']
-
-        max_native_quote_qty_without_fees = limit_price * max_base_qty
-
-        is_maker = order_type == serum3_order_type.PostOnly()
-
-        fees = {True: - (0.5 / 1e4), False: (1 / 1e4)}[is_maker]
-
-        max_native_quote_qty_including_fees = max_native_quote_qty_without_fees + round(max_native_quote_qty_without_fees * fees)
-
-        client_order_id = round(time.time_ns() / 1e6)
-
-        serum3_place_order_args: Serum3PlaceOrderArgs = {
-            'side': {'bids': serum3_side.Bid(), 'asks': serum3_side.Ask()}[side],
-            'limit_price': limit_price,
-            'max_base_qty': max_base_qty,
-            'max_native_quote_qty_including_fees': max_native_quote_qty_including_fees,
-            'self_trade_behavior': serum3_self_trade_behavior.DecrementTake(),
-            'order_type': order_type,
-            'client_order_id': client_order_id,
-            'limit': 10
-        }
-
-        serum3 = [serum3 for serum3 in self.mango_account.serum3 if serum3.market_index == serum_market_index][0]
-
-        if serum3 is None:
-            raise Exception('serum3 account not found')
-
-        payer_token_index = {
-            'bids': serum_market.quote_token_index,
-            'asks': serum_market.base_token_index
-        }[side]
-
-        bank = [bank for bank in self.banks if bank.token_index == payer_token_index][0]
-
-        banks_config = [
-            {
-                'tokenIndex': token_config['tokenIndex'],
-                'publicKey': PublicKey(token_config['banks'][0]['publicKey'])
-            }
-            for token_config in self.group_config['tokens']
-            if token_config['active']
-        ]
-
-        bank_config = [bank_config for bank_config in banks_config if bank_config['tokenIndex'] == bank.token_index][0]
-
-        serum_market_external_vault_signer_address = PublicKey.create_program_address([
-            bytes(serum_market.serum_market_external),
-            serum_market_external.state.vault_signer_nonce().to_bytes(8, 'little')
-        ], SERUM_PROGRAM_ID)
-
-        serum3_place_order_accounts: Serum3PlaceOrderAccounts = {
-            'group': self.mango_account.group,
-            'account': PublicKey(self.mango_account_pk),
-            'owner': self.mango_account.owner,
-            'open_orders': serum3.open_orders,
-            'serum_market': PublicKey(serum_market_config['publicKey']),
-            'serum_program': SERUM_PROGRAM_ID,
-            'serum_market_external': serum_market.serum_market_external,
-            'market_bids': serum_market_external.state.bids(),
-            'market_asks': serum_market_external.state.asks(),
-            'market_event_queue': serum_market_external.state.event_queue(),
-            'market_request_queue': serum_market_external.state.request_queue(),
-            'market_base_vault': serum_market_external.state.base_vault(),
-            'market_quote_vault': serum_market_external.state.quote_vault(),
-            'market_vault_signer': serum_market_external_vault_signer_address,
-            'payer_bank': bank_config['publicKey'],
-            'payer_vault': bank.vault,
-            'payer_oracle': bank.oracle
-        }
-
-        remaining_accounts = self._health_remaining_accounts('fixed', [], [])
-
-        serum3_place_order_ix = serum3_place_order(
-            serum3_place_order_args,
-            serum3_place_order_accounts,
-            remaining_accounts=remaining_accounts
-        )
-
-        return serum3_place_order_ix
-
-    def make_serum3_create_open_orders_ix(self, symbol):
-        serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
-
-        serum_market_index = serum_market_config['marketIndex']
-
-        serum_market = [
-            serum_market
-            for serum_market in self.serum_markets
-            if serum_market.market_index == serum_market_index
-        ][0]
-
-        [open_orders_pk, nonce] = PublicKey.find_program_address(
-            [
-                bytes('Serum3OO', 'utf-8'),
-                bytes(PublicKey(self.mango_account_pk)),
-                bytes(PublicKey(serum_market_config['publicKey']))
-            ],
-            MANGO_PROGRAM_ID
-        )
-
-        serum3_create_open_orders_accounts: Serum3CreateOpenOrdersAccounts = {
-            'group': self.mango_account.group,
-            'account': PublicKey(self.mango_account_pk),
-            'owner': self.provider.wallet.public_key,
-            'serum_market': PublicKey(serum_market_config['publicKey']),
-            'serum_program': serum_market.serum_program,
-            'serum_market_external': serum_market.serum_market_external,
-            'open_orders': open_orders_pk,
-            'payer': self.provider.wallet.public_key,
-        }
-
-        serum3_create_open_orders_ix = serum3_create_open_orders(serum3_create_open_orders_accounts)
-
-        return serum3_create_open_orders_ix
-
-    def make_perp_place_order_ix(self, symbol, side, price, size):
-        perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
-
-        perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
-
-        quote_decimals = 6
-
-        def to_native(ui_amount: float, decimals: float) -> int:
-            return int(ui_amount * 10 ** decimals)
-
-        def ui_price_to_lots(perp_market: PerpMarket, price: float) -> int:
-            return int(to_native(price, quote_decimals) * perp_market.base_lot_size / (perp_market.quote_lot_size * 10 ** perp_market.base_decimals))
-
-        def ui_base_to_lots(perp_market: PerpMarket, size: float) -> int:
-            return int(to_native(size, perp_market.base_decimals) // perp_market.base_lot_size)
-
-        perp_place_order_args: PerpPlaceOrderArgs = {
-            'side': {'bids': Bid, 'asks': Ask}[side],
-            'price_lots': ui_price_to_lots(perp_market, price),
-            'max_base_lots': ui_base_to_lots(perp_market, size),
-            'max_quote_lots': sys.maxsize,
-            'client_order_id': int(time.time() * 1e3),
-            'order_type': place_order_type.Limit(),
-            'reduce_only': False,
-            'expiry_timestamp': 0,
-            'limit': 10
-        }
-
-        perp_place_order_accounts: PerpPlaceOrderAccounts = {
-            'group': perp_market.group,
-            'account': PublicKey(self.mango_account_pk),
-            'owner': self.provider.wallet.public_key,
-            'perp_market': PublicKey(perp_market_config['publicKey']),
-            'bids': perp_market.bids,
-            'asks': perp_market.asks,
-            'event_queue': perp_market.event_queue,
-            'oracle': perp_market.oracle
-        }
-
-        remaining_accounts = self._health_remaining_accounts('fixed', [[bank for bank in self.banks if bank.token_index == 0][0]], [perp_market])
-
-        perp_place_order_ix = perp_place_order(
-            perp_place_order_args,
-            perp_place_order_accounts,
-            remaining_accounts=remaining_accounts
-        )
-
-        return perp_place_order_ix
-
-    async def place_order(
-        self,
-        symbol: str,
-        side: Literal['bids', 'asks'],
-        price: float,
-        size: float
-    ):
-        market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
-
-        match market_type:
-            case 'spot':
-                serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
-
-                serum_market_index = serum_market_config['marketIndex']
-
-                try:
-                    serum3 = [serum3 for serum3 in self.mango_account.serum3 if serum3.market_index == serum_market_index][0]
-                except IndexError:
-                    logging.error(f"Open orders account for {symbol} not found, creating one...")
-
-                    serum3_create_open_orders_ix = self.make_serum3_create_open_orders_ix('SOL/USDC')
-
-                    recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
-
-                    tx = Transaction()
-
-                    tx.recent_blockhash = str(recent_blockhash)
-
-                    tx.add(serum3_create_open_orders_ix)
-
-                    tx.sign(self.provider.wallet.payer)
-
-                    response = await self.provider.send(tx)
-
-                    logging.error(f"Waiting for Open Orders account creation confirmation...")
-
-                    await self.provider.connection.confirm_transaction(response)
-
-                    logging.error(f"Open orders account created for {symbol}.")
-
-                    self.mango_account = await MangoAccount.fetch(
-                        self.provider.connection,
-                        PublicKey(self.mango_account_pk)
-                    )
-
-                serum3_place_order_ix = self.make_serum3_place_order_ix(
-                    symbol,
-                    side,
-                    price,
-                    size
-                )
-
-                tx = Transaction()
-
-                recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
-
-                tx.recent_blockhash = str(recent_blockhash)
-
-                tx.add(serum3_place_order_ix)
-
-                tx.sign(self.provider.wallet.payer)
-
-                response = await self.provider.send(tx)
-
-                return response
-            case 'perpetual':
-                tx = Transaction()
-
-                recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
-
-                tx.recent_blockhash = str(recent_blockhash)
-
-                perp_place_order_ix = self.make_perp_place_order_ix(symbol, side, price, size)
-
-                tx.add(perp_place_order_ix)
-
-                tx.sign(self.provider.wallet.payer)
-
-                response = await self.provider.send(tx)
-
-                return response
-
-    def make_serum3_cancel_all_orders_ix(self, symbol: str):
-        serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
-
-        serum_market_index = serum_market_config['marketIndex']
-
-        serum_market = [
-            serum_market
-            for serum_market in self.serum_markets
-            if serum_market.market_index == serum_market_index
-        ][0]
-
-        try:
-            serum3 = [serum3 for serum3 in self.mango_account.serum3 if serum3.market_index == serum_market_index][0]
-        except IndexError as error:
-            print(error)
-
-        serum_market_external = [
-            serum_market_external
-            for serum_market_external in self.serum_markets_external
-            if serum_market_external.state.public_key() == serum_market.serum_market_external
-        ][0]
-
-        serum3_cancel_all_orders_args: Serum3CancelAllOrdersArgs = {
-            'limit': 10
-        }
-
-        serum3_cancel_all_orders_accounts: Serum3CancelAllOrdersAccounts = {
-            'group': self.mango_account.group,
-            'account': PublicKey(self.mango_account_pk),
-            'owner': self.provider.wallet.public_key,
-            'open_orders': serum3.open_orders,
-            'serum_market': PublicKey(serum_market_config['publicKey']),
-            'serum_program': serum_market.serum_program,
-            'serum_market_external': serum_market.serum_market_external,
-            'market_bids': serum_market_external.state.bids(),
-            'market_asks': serum_market_external.state.asks(),
-            'market_event_queue': serum_market_external.state.event_queue()
-        }
-
-        serum3_cancel_all_orders_ix = serum3_cancel_all_orders(
-            serum3_cancel_all_orders_args,
-            serum3_cancel_all_orders_accounts
-        )
-
-        return serum3_cancel_all_orders_ix
-
-    def make_perp_cancel_all_orders_ix(self, symbol: str):
-        perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
-
-        perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
-
-        perp_cancel_all_orders_args: PerpCancelAllOrdersArgs = {
-            'limit': 10
-        }
-
-        perp_cancel_all_orders_accounts: PerpCancelAllOrdersAccounts = {
-            'group': perp_market.group,
-            'account': PublicKey(self.mango_account_pk),
-            'owner': self.provider.wallet.public_key,
-            'perp_market': PublicKey(perp_market_config['publicKey']),
-            'bids': perp_market.bids,
-            'asks': perp_market.asks
-        }
-
-        perp_cancel_all_orders_ix = perp_cancel_all_orders(perp_cancel_all_orders_args, perp_cancel_all_orders_accounts)
-
-        return perp_cancel_all_orders_ix
-
-    async def cancel_all_orders(self, symbol: str):
-        market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
-
-        match market_type:
-            case 'spot':
-                tx = Transaction()
-
-                recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
-
-                tx.recent_blockhash = str(recent_blockhash)
-
-                serum3_cancel_all_orders_ix = self.make_serum3_cancel_all_orders_ix(symbol)
-
-                tx.add(serum3_cancel_all_orders_ix)
-
-                tx.sign(self.provider.wallet.payer)
-
-                response = await self.provider.send(tx)
-
-                return response
-            case 'perpetual':
-                tx = Transaction()
-
-                recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
-
-                tx.recent_blockhash = str(recent_blockhash)
-
-                perp_cancel_all_orders_ix = self.make_perp_cancel_all_orders_ix(symbol)
-
-                tx.add(perp_cancel_all_orders_ix)
-
-                tx.sign(self.provider.wallet.payer)
-
-                response = await self.provider.send(tx)
-
-                return response
-
-    async def balances(self):
-        # TODO: Clean up this mess
-        return [
-            {
-                'symbol': meta['symbol'],
-                'balance': float(
-                    meta['token_indexed_position'] * (
-                        meta['bank_deposit_index'] if meta['token_indexed_position'] > 0
-                        else meta['bank_borrow_index']
-                    )
-                    /
-                    meta['bank_mint_decimals']
-                )
-            }
-            for meta in
-            [
-                {
-                    'symbol': token_config['symbol'],
-                    'token_indexed_position': Decimal(token.indexed_position.val) / divider,
-                    'bank_mint_decimals': 10 ** bank.mint_decimals,
-                    'bank_deposit_index': Decimal(bank.deposit_index.val) / divider,
-                    'bank_borrow_index': Decimal(bank.borrow_index.val) / divider,
-                }
-                for token, bank, token_config, divider in
-                [
-                    [
-                        token,
-                        [bank for bank in self.banks if bank.token_index == token.token_index][0],
-                        [token_config for token_config in self.group_config['tokens'] if token_config['tokenIndex'] == token.token_index][0],
-                        Decimal(2 ** (8 * 6))
-                    ]
-                    for token in self.mango_account.tokens
-                    if token.token_index != 65535
-                ]
-            ]
-        ]
-
-    def make_place_perp_pegged_order_ix(
-        self,
-        symbol: str,
-        side: Literal['bids', 'asks'],
-        price_offset: float,
-        peg_limit: float,
-        quantity: float,
-        max_quote_quantity: float = None,
-        client_order_id: int = int(time.time()),
-        expiry_timestamp: int = 0,
-        limit: int = 10,
-        reduce_only: bool = False
-    ):
-        perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
-
-        perp_market: PerpMarket = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
-
-        perp_place_order_pegged_args: PerpPlaceOrderPeggedArgs = {
-            'side': {'bids': Bid, 'asks': Ask}[side],
-            'price_offset_lots': perp_market.ui_price_to_lots(price_offset),
-            'peg_limit': perp_market.ui_price_to_lots(peg_limit),
-            'max_base_lots': perp_market.ui_base_to_lots(quantity),
-            'max_quote_lots': perp_market.ui_quote_to_lots(max_quote_quantity) if max_quote_quantity else RUST_I64_MAX,
-            'client_order_id': client_order_id,
-            'order_type': Limit,
-            'reduce_only': reduce_only,
-            'expiry_timestamp': expiry_timestamp,
-            'limit': limit,
-            'max_oracle_staleness_slots': -1
-        }
-
-        perp_place_order_pegged_accounts: PerpPlaceOrderPeggedAccounts = {
-            'group': PublicKey(self.group_config['publicKey']),
-            'account': PublicKey(self.mango_account_pk),
-            'owner': self.mango_account.owner,
-            'perp_market': PublicKey(perp_market_config['publicKey']),
-            'bids': perp_market.bids,
-            'asks': perp_market.asks,
-            'event_queue': perp_market.event_queue,
-            'oracle': perp_market.oracle
-        }
-
-        remaining_accounts = self._health_remaining_accounts(
-            'fixed',
-            [bank for bank in self.banks if bank.token_index == 0],
-            [perp_market]
-        )
-
-        return perp_place_order_pegged(
-            perp_place_order_pegged_args,
-            perp_place_order_pegged_accounts,
-            remaining_accounts=remaining_accounts
-        )
-
-    async def place_perp_pegged_order(
-        self,
-        symbol: str,
-        side: Literal['bids', 'asks'],
-        price_offset: float,
-        peg_limit: float,
-        quantity: float,
-        max_quote_quantity: float = None,
-        client_order_id: int = int(time.time()),
-        expiry_timestamp: int = 0,
-        limit: int = 10,
-        reduce_only: bool = False
-    ):
-        tx = Transaction()
-
-        recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
-
-        tx.recent_blockhash = str(recent_blockhash)
-
-        tx.add(
-            self.make_place_perp_pegged_order_ix(
-                symbol,
-                side,
-                price_offset,
-                peg_limit,
-                quantity,
-                max_quote_quantity,
-                client_order_id,
-                expiry_timestamp,
-                limit,
-                reduce_only
-            )
-        )
-
-        tx.sign(self.provider.wallet.payer)
-
-        response = await self.provider.send(tx)
-
-        return response
-
-    async def funding_rate(self, symbol: str):
-        # TODO: Fetch the perp market alongside the other data, just so that it's always within the same slot
-
-        perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
-
-        perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
-
-        accounts = await self.provider.connection.get_multiple_accounts([perp_market.bids, perp_market.asks, perp_market.oracle])
-
-        raw_bids, raw_asks, raw_oracle = accounts.value
-
-        bids, asks, oracle = BookSide.decode(raw_bids.data), BookSide.decode(raw_asks.data), pyth.PRICE.parse(raw_oracle.data)
-
-        oracle_price = float(Decimal(str(oracle.agg.price)) * Decimal(10) ** oracle.expo)
-
-        [bids, asks] = [BookSideItems('bids', bids, perp_market, oracle_price), BookSideItems('asks', asks, perp_market, oracle_price)]
-
-        min_funding, max_funding = float(perp_market.min_funding), float(perp_market.max_funding)
-
-        impact_quantity = perp_market.base_lots_to_ui(perp_market.impact_quantity)
-
-        bid, ask = [bids.impact_price(impact_quantity), asks.impact_price(impact_quantity)]
-
-        if bid and ask:
-            mid_price = (bid + ask) / 2
-
-            funding = min(max(mid_price / oracle_price - 1, min_funding), max_funding)
-        elif bid:
-            funding = max_funding
-        elif ask:
-            funding = min_funding
-        else:
-            funding = 0
-
-        return funding / 24 / 10 ** QUOTE_DECIMALS
-
     async def fills(self, symbol: str):
         # TODO: Validate that the symbol entered is valid
 
@@ -1043,7 +391,7 @@ class MangoClient():
 
                 perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
 
-                response = await self.provider.connection.get_account_info(perp_market.event_queue)
+                response = await self.connection.get_account_info(perp_market.event_queue)
 
                 event_queue = EventQueue.decode(response.value.data)
 
@@ -1089,7 +437,7 @@ class MangoClient():
 
                 lead = None
 
-                async with connect(self.rpc_url.replace('https://', 'wss://')) as websocket:
+                async with connect(self.connection._provider.endpoint_uri.replace('https://', 'wss://')) as websocket:
                     await websocket.account_subscribe(perp_market.event_queue, Processed, 'jsonParsed')
 
                     async for message in websocket:
@@ -1137,310 +485,921 @@ class MangoClient():
 
                             lead = fills[-1:][0].seq_num
 
-    async def equity(self):
-        oracle_price_by_token_index = {}
+    async def funding_rate(self, symbol: str):
+        perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
-        oracle_price_by_oracle_pk = {}
+        perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
 
-        for bank, raw_oracle in zip(
-            self.banks,
-            await asyncio.gather(*[self.provider.connection.get_account_info(bank.oracle) for bank in self.banks])
-        ):
-            name = bytes(bank.name).decode().strip('\x00')
+        accounts = await self.connection.get_multiple_accounts([perp_market.bids, perp_market.asks, perp_market.oracle])
 
-            if name == 'USDC':
-                oracle_price = 1
-            else:
-                # TODO: Handle MNGO's oracle (not Pyth)
+        raw_bids, raw_asks, raw_oracle = accounts.value
 
-                oracle = pyth.PRICE.parse(raw_oracle.value.data)
+        bids, asks, oracle = BookSide.decode(raw_bids.data), BookSide.decode(raw_asks.data), pyth.PRICE.parse(raw_oracle.data)
 
-                oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
+        oracle_price = float(Decimal(str(oracle.agg.price)) * Decimal(10) ** oracle.expo)
 
-            oracle_price_by_token_index[bank.token_index] = oracle_price
+        [bids, asks] = [BookSideItems('bids', bids, perp_market, oracle_price), BookSideItems('asks', asks, perp_market, oracle_price)]
 
-            oracle_price_by_oracle_pk[bank.oracle] = oracle_price
+        min_funding, max_funding = float(perp_market.min_funding.to_decimal()), float(perp_market.max_funding.to_decimal())
 
-        balance_by_token_index = {}
+        impact_quantity = PerpMarketHelper.base_lots_to_ui(perp_market, perp_market.impact_quantity)
 
-        for token, bank in [
-            (
-                token,
-                [bank for bank in self.banks if bank.token_index == token.token_index][0]
-            )
-            for token in filter(TokenPositionHelper.is_active, self.mango_account.tokens)
-        ]:
-            oracle_price = oracle_price_by_token_index[token.token_index]
+        bid, ask = [bids.impact_price(impact_quantity), asks.impact_price(impact_quantity)]
 
-            balance_by_token_index[token.token_index] = Decimal(str(TokenPositionHelper.balance(token, bank))) * oracle_price
+        if bid and ask:
+            mid_price = (bid + ask) / 2
 
-        active_open_orders = [open_orders for open_orders in self.mango_account.serum3 if Serum3OrdersHelper.is_active(open_orders)]
-
-        for open_orders, open_orders_external in zip(
-            active_open_orders,
-            await asyncio.gather(*[
-                AsyncOpenOrdersAccount.load(self.provider.connection, str(open_orders.open_orders))
-                for open_orders
-                in active_open_orders
-            ])
-        ):
-            # TODO: Account for referrerRebatesAccrued - this isn't available yet in pyserum
-
-            balance_by_token_index[open_orders.base_token_index] += open_orders_external.base_token_total * oracle_price_by_token_index[open_orders.base_token_index]
-
-        token_equity = sum(balance_by_token_index.values())
-
-        perp_equity = sum([
-            PerpPositionHelper.equity(perp_position, perp_market, oracle_price_by_oracle_pk[perp_market.oracle])
-            for perp_position, perp_market in [
-                (
-                    perp_position,
-                    [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_position.market_index][0]
-                )
-                for perp_position in self.mango_account.perps
-                if PerpPositionHelper.is_active(perp_position)
-            ]
-        ])
-
-        return token_equity + perp_equity
-
-    async def health_ratio(self, health_type: Literal['init', 'maint', 'liquidation_end']):
-        health_type: HealthTypeKind = {
-            'init': Init(),
-            'maint': Maint(),
-            'liquidation_end': LiquidationEnd()
-        }[health_type]
-
-        # Build the health cache
-
-        token_positions = [
-            token_position
-            for token_position in self.mango_account.tokens
-            if token_position.token_index != 65535
-        ]
-
-        banks = [
-            [bank for bank in self.banks if bank.token_index == token_position.token_index][0]
-            for token_position in token_positions
-        ]
-
-        raw_oracles = await self.provider.connection.get_multiple_accounts([bank.oracle for bank in banks])
-
-        def oracle_price_from_account_info(account: Account):
-            match str(account.owner):
-                case 'FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH': # Pyth
-                    oracle = pyth.PRICE.parse(account.data)
-
-                    return oracle.agg.price * (Decimal(10) ** oracle.expo)
-                case '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg': # For now it's always USDC
-                    return Decimal(1)
-
-        oracle_prices = [
-            oracle_price_from_account_info(account)
-            for account in raw_oracles.value
-        ]
-
-        token_infos = [
-            TokenInfo(
-                bank.token_index,
-                bank.maint_asset_weight,
-                bank.init_asset_weight,
-                BankHelper.scaled_init_asset_weight(bank, PricesHelper.liab(prices, Init())),
-                bank.maint_liab_weight,
-                bank.init_liab_weight,
-                BankHelper.scaled_init_liab_weight(bank, PricesHelper.liab(prices, Init())),
-                prices,
-                I80F48.from_decimal(TokenPositionHelper.balance(token_position, bank))
-            )
-            for bank, token_position, prices
-            in zip(
-                banks,
-                token_positions,
-                [
-                    Prices(
-                        oracle=I80F48.from_decimal(oracle_price * Decimal(10 ** (6 - bank.mint_decimals))),
-                        stable=I80F48.from_decimal(Decimal(bank.stable_price_model.stable_price))
-                    )
-                    for bank, oracle_price in zip(banks, oracle_prices)
-                ]
-            )
-        ]
-
-        serum3_infos = []
-
-        for open_orders, open_orders_external in zip(
-                MangoAccountHelper.active_serum3_orders(self.mango_account),
-                await asyncio.gather(*[
-                    AsyncOpenOrdersAccount.load(self.provider.connection, str(open_orders.open_orders))
-                    for open_orders
-                    in MangoAccountHelper.active_serum3_orders(self.mango_account)
-                ])
-        ):
-            base_index, base_info = [
-                (index, token_info)
-                for index, token_info in enumerate(token_infos)
-                if token_info.token_index == open_orders.base_token_index
-            ][0]
-
-            if not base_info:
-                raise ValueError(f"Base token info not found for market index {open_orders.market_index}")
-
-            quote_index, quote_info = [
-                (index, token_info)
-                for index, token_info in enumerate(token_infos)
-                if token_info.token_index == open_orders.quote_token_index
-            ][0]
-
-            if not quote_info:
-                raise ValueError(f"Quote token info not found for market index {open_orders.market_index}")
-
-            reserved_base = open_orders_external.base_token_total - open_orders_external.base_token_free
-
-            reserved_quote = open_orders_external.quote_token_total - open_orders_external.quote_token_free
-
-            serum3_infos.append(
-                Serum3Info(
-                    reserved_base=I80F48.from_decimal(Decimal(reserved_base)),
-                    reserved_quote=I80F48.from_decimal(Decimal(reserved_quote)),
-                    base_index=base_index,
-                    quote_index=quote_index,
-                    market_index=open_orders.market_index,
-                    has_zero_funds=False
-                )
-            )
-
-        perp_positions = MangoAccountHelper.active_perp_positions(self.mango_account)
-
-        perp_markets = [
-            [
-                perp_market
-                for perp_market in self.perp_markets
-                if perp_market.perp_market_index == perp_position.market_index
-            ][0]
-            for perp_position in perp_positions
-
-        ]
-
-        perp_market_oracle_prices = [
-            oracle_price_from_account_info(raw_oracle)
-            for raw_oracle in (await self.provider.connection.get_multiple_accounts([perp_market.oracle for perp_market in perp_markets])).value
-        ]
-
-        perp_infos = []
-
-        for perp_position, perp_market, perp_market_oracle_price in zip(
-            perp_positions,
-            perp_markets,
-            perp_market_oracle_prices
-        ):
-            base_lots = perp_position.base_position_lots + perp_position.taker_base_lots
-
-            unsettled_funding = PerpPositionHelper.unsettled_funding(perp_position, perp_market)
-
-            taker_quote = perp_position.taker_quote_lots * perp_market.quote_lot_size
-
-            quote_current = I80F48.from_decimal(perp_position.quote_position_native.to_decimal() - unsettled_funding + Decimal(taker_quote))
-
-            perp_info = PerpInfo(
-                perp_market.perp_market_index,
-                perp_market.maint_base_asset_weight,
-                perp_market.init_base_asset_weight,
-                perp_market.maint_base_liab_weight,
-                perp_market.init_base_liab_weight,
-                perp_market.maint_overall_asset_weight,
-                perp_market.init_overall_asset_weight,
-                perp_market.base_lot_size,
-                base_lots,
-                perp_position.bids_base_lots,
-                perp_position.asks_base_lots,
-                quote_current,
-                Prices(
-                    oracle=I80F48.from_decimal(perp_market_oracle_price * Decimal(10 ** (6 - perp_market.base_decimals))),
-                    stable=I80F48.from_decimal(Decimal(perp_market.stable_price_model.stable_price))
-                ),
-                PerpPositionHelper.has_open_orders(perp_position),
-                PerpPositionHelper.has_open_fills(perp_position)
-            )
-
-            perp_infos.append(perp_info)
-
-        health_cache = HealthCache(
-            token_infos,
-            serum3_infos,
-            perp_infos,
-            False
-        )
-
-        assets = 0
-
-        liabs = 0
-
-        for token_info in health_cache.token_infos:
-            contrib = TokenInfoHelper.health_contribution(token_info, health_type)
-
-            if contrib > 0:
-                assets += contrib
-            else:
-                liabs -= contrib
-
-        def get_serum3_reservations(health_type: HealthTypeKind):
-            token_max_reserved = [0 for _ in range(0, len(token_infos))]
-
-            serum3_reserved: [Serum3Reserved] = []
-
-            for serum3_info in serum3_infos:
-                quote, base = token_infos[serum3_info.quote_index], token_infos[serum3_info.base_index]
-
-                reserved_base, reserved_quote = serum3_info.reserved_base.to_decimal(), serum3_info.reserved_quote.to_decimal()
-
-                quote_asset = PricesHelper.asset(quote.prices, health_type)
-
-                base_liab = PricesHelper.liab(base.prices, health_type)
-
-                all_reserved_as_base = reserved_base + reserved_quote * quote_asset / base_liab
-
-                base_asset = PricesHelper.asset(base.prices, health_type)
-
-                quote_liab = PricesHelper.liab(quote.prices, health_type)
-
-                all_reserved_as_quote = reserved_quote + reserved_base * base_asset / quote_liab
-
-                token_max_reserved[serum3_info.base_index] += all_reserved_as_base
-
-                token_max_reserved[serum3_info.quote_index] += all_reserved_as_quote
-
-                serum3_reserved.append(Serum3Reserved(all_reserved_as_base, all_reserved_as_quote))
-
-            return {
-                'token_max_reserved': token_max_reserved,
-                'serum3_reserved': serum3_reserved
-            }
-
-        res = get_serum3_reservations(Maint())
-
-        for index, serum3_info in enumerate(serum3_infos):
-            contrib = Serum3InfoHelper.health_contribution(
-                serum3_info,
-                health_type,
-                health_cache.token_infos,
-                res['token_max_reserved'],
-                res['serum3_reserved'][index]
-            ).to_decimal()
-
-            if contrib > 0:
-                assets += contrib
-            else:
-                liabs -= contrib
-
-        for perp_info in health_cache.perp_infos:
-            contrib = PerpInfoHelper.health_contribution(perp_info, health_type).to_decimal()
-
-            if contrib > 0:
-                assets += contrib
-            else:
-                liabs -= contrib
-
-        if liabs > 0.001:
-            return 100 * (assets - liabs) / liabs
+            funding = min(max(mid_price / oracle_price - 1, min_funding), max_funding)
+        elif bid:
+            funding = max_funding
+        elif ask:
+            funding = min_funding
         else:
-            return sys.maxsize
+            funding = 0
+
+        return {
+            'symbol': symbol,
+            'funding_rate': funding / 24 / 10 ** QUOTE_DECIMALS
+        }
+
+    # def _health_remaining_accounts(
+    #     self,
+    #     retriever: Literal['fixed', 'scanning'],
+    #     banks: [Bank],
+    #     perp_markets: [PerpMarket]
+    # ) -> [AccountMeta]:
+    #     health_remaining_account_pks = []
+    #
+    #     match retriever:
+    #         case 'fixed':
+    #             token_indices = [token.token_index for token in self.mango_account.tokens]
+    #
+    #             if len(banks) > 0:
+    #                 for bank in banks:
+    #                     if bank.token_index not in token_indices:
+    #                         index = [
+    #                             idx for idx, token in enumerate(self.mango_account.tokens)
+    #                             if token.token_index == 65535
+    #                             if token_indices[idx] == 65535
+    #                         ][0]
+    #
+    #                         token_indices[index] = bank.token_index
+    #
+    #             mint_infos = [
+    #                 mint_info for mint_info in self.mint_infos
+    #                 if mint_info.token_index in [token_index for token_index in token_indices if token_index != 65535]
+    #             ]
+    #
+    #             health_remaining_account_pks.extend([mint_info.banks[0] for mint_info in mint_infos])
+    #
+    #             health_remaining_account_pks.extend([mint_info.oracle for mint_info in mint_infos])
+    #
+    #             perp_market_indices = [perp.market_index for perp in self.mango_account.perps]
+    #
+    #             if len(perp_markets) > 0:
+    #                 for perp_market in perp_markets:
+    #                     if perp_market.perp_market_index not in perp_market_indices:
+    #                         index = [
+    #                             idx for idx, perp in enumerate(self.mango_account.perps)
+    #                             if perp.market_index == 65535
+    #                             if perp_market_indices[idx] == 65535
+    #                         ][0] = perp_market.perp_market_index
+    #
+    #                         perp_market_indices[index] = perp_market.perp_market_index
+    #
+    #             perp_markets = [
+    #                 perp_market for perp_market in self.perp_markets
+    #                 if perp_market.perp_market_index in [perp_index for perp_index in perp_market_indices if perp_index != 65535]
+    #             ]
+    #
+    #             perp_market_pks = [
+    #                 PublicKey(perp_market_config['publicKey']) for perp_market_config in self.group_config['perpMarkets']
+    #                 if perp_market_config['marketIndex'] in [perp_market.perp_market_index for perp_market in perp_markets]
+    #             ]
+    #
+    #             health_remaining_account_pks.extend(perp_market_pks)
+    #
+    #             health_remaining_account_pks.extend([perp_market.oracle for perp_market in perp_markets])
+    #
+    #             health_remaining_account_pks.extend([serum3.open_orders for serum3 in self.mango_account.serum3 if serum3.market_index != 65535])
+    #         case 'scanning':
+    #             raise NotImplementedError()
+    #
+    #     remaining_accounts: [AccountMeta] = [
+    #         AccountMeta(pubkey=remaining_account_pk, is_writable=False, is_signer=False)
+    #         for remaining_account_pk in health_remaining_account_pks
+    #     ]
+    #
+    #     return remaining_accounts
+    #
+    # def make_serum3_place_order_ix(self, symbol: str, side: Literal['bids', 'asks'], price: float, size: float):
+    #     serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
+    #
+    #     serum_market_index = serum_market_config['marketIndex']
+    #
+    #     serum_market = [
+    #         serum_market
+    #         for serum_market in self.serum_markets
+    #         if serum_market.market_index == serum_market_index
+    #     ][0]
+    #
+    #     serum_market_external = [
+    #         serum_market_external
+    #         for serum_market_external in self.serum_markets_external
+    #         if serum_market_external.state.public_key() == serum_market.serum_market_external
+    #     ][0]
+    #
+    #     limit_price = serum_market_external.state.price_number_to_lots(price)
+    #
+    #     max_base_qty = serum_market_external.state.base_size_number_to_lots(size)
+    #
+    #     order_type = {'limit': serum3_order_type.Limit(), 'immediate_or_cancel': serum3_order_type.ImmediateOrCancel()}['limit']
+    #
+    #     max_native_quote_qty_without_fees = limit_price * max_base_qty
+    #
+    #     is_maker = order_type == serum3_order_type.PostOnly()
+    #
+    #     fees = {True: - (0.5 / 1e4), False: (1 / 1e4)}[is_maker]
+    #
+    #     max_native_quote_qty_including_fees = max_native_quote_qty_without_fees + round(max_native_quote_qty_without_fees * fees)
+    #
+    #     client_order_id = round(time.time_ns() / 1e6)
+    #
+    #     serum3_place_order_args: Serum3PlaceOrderArgs = {
+    #         'side': {'bids': serum3_side.Bid(), 'asks': serum3_side.Ask()}[side],
+    #         'limit_price': limit_price,
+    #         'max_base_qty': max_base_qty,
+    #         'max_native_quote_qty_including_fees': max_native_quote_qty_including_fees,
+    #         'self_trade_behavior': serum3_self_trade_behavior.DecrementTake(),
+    #         'order_type': order_type,
+    #         'client_order_id': client_order_id,
+    #         'limit': 10
+    #     }
+    #
+    #     serum3 = [serum3 for serum3 in self.mango_account.serum3 if serum3.market_index == serum_market_index][0]
+    #
+    #     if serum3 is None:
+    #         raise Exception('serum3 account not found')
+    #
+    #     payer_token_index = {
+    #         'bids': serum_market.quote_token_index,
+    #         'asks': serum_market.base_token_index
+    #     }[side]
+    #
+    #     bank = [bank for bank in self.banks if bank.token_index == payer_token_index][0]
+    #
+    #     banks_config = [
+    #         {
+    #             'tokenIndex': token_config['tokenIndex'],
+    #             'publicKey': PublicKey(token_config['banks'][0]['publicKey'])
+    #         }
+    #         for token_config in self.group_config['tokens']
+    #         if token_config['active']
+    #     ]
+    #
+    #     bank_config = [bank_config for bank_config in banks_config if bank_config['tokenIndex'] == bank.token_index][0]
+    #
+    #     serum_market_external_vault_signer_address = PublicKey.create_program_address([
+    #         bytes(serum_market.serum_market_external),
+    #         serum_market_external.state.vault_signer_nonce().to_bytes(8, 'little')
+    #     ], SERUM_PROGRAM_ID)
+    #
+    #     serum3_place_order_accounts: Serum3PlaceOrderAccounts = {
+    #         'group': self.mango_account.group,
+    #         'account': PublicKey(self.mango_account_pk),
+    #         'owner': self.mango_account.owner,
+    #         'open_orders': serum3.open_orders,
+    #         'serum_market': PublicKey(serum_market_config['publicKey']),
+    #         'serum_program': SERUM_PROGRAM_ID,
+    #         'serum_market_external': serum_market.serum_market_external,
+    #         'market_bids': serum_market_external.state.bids(),
+    #         'market_asks': serum_market_external.state.asks(),
+    #         'market_event_queue': serum_market_external.state.event_queue(),
+    #         'market_request_queue': serum_market_external.state.request_queue(),
+    #         'market_base_vault': serum_market_external.state.base_vault(),
+    #         'market_quote_vault': serum_market_external.state.quote_vault(),
+    #         'market_vault_signer': serum_market_external_vault_signer_address,
+    #         'payer_bank': bank_config['publicKey'],
+    #         'payer_vault': bank.vault,
+    #         'payer_oracle': bank.oracle
+    #     }
+    #
+    #     remaining_accounts = self._health_remaining_accounts('fixed', [], [])
+    #
+    #     serum3_place_order_ix = serum3_place_order(
+    #         serum3_place_order_args,
+    #         serum3_place_order_accounts,
+    #         remaining_accounts=remaining_accounts
+    #     )
+    #
+    #     return serum3_place_order_ix
+    #
+    # def make_serum3_create_open_orders_ix(self, symbol):
+    #     serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
+    #
+    #     serum_market_index = serum_market_config['marketIndex']
+    #
+    #     serum_market = [
+    #         serum_market
+    #         for serum_market in self.serum_markets
+    #         if serum_market.market_index == serum_market_index
+    #     ][0]
+    #
+    #     [open_orders_pk, nonce] = PublicKey.find_program_address(
+    #         [
+    #             bytes('Serum3OO', 'utf-8'),
+    #             bytes(PublicKey(self.mango_account_pk)),
+    #             bytes(PublicKey(serum_market_config['publicKey']))
+    #         ],
+    #         MANGO_PROGRAM_ID
+    #     )
+    #
+    #     serum3_create_open_orders_accounts: Serum3CreateOpenOrdersAccounts = {
+    #         'group': self.mango_account.group,
+    #         'account': PublicKey(self.mango_account_pk),
+    #         'owner': self.provider.wallet.public_key,
+    #         'serum_market': PublicKey(serum_market_config['publicKey']),
+    #         'serum_program': serum_market.serum_program,
+    #         'serum_market_external': serum_market.serum_market_external,
+    #         'open_orders': open_orders_pk,
+    #         'payer': self.provider.wallet.public_key,
+    #     }
+    #
+    #     serum3_create_open_orders_ix = serum3_create_open_orders(serum3_create_open_orders_accounts)
+    #
+    #     return serum3_create_open_orders_ix
+    #
+    # def make_perp_place_order_ix(self, symbol, side, price, size):
+    #     perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
+    #
+    #     perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
+    #
+    #     quote_decimals = 6
+    #
+    #     def to_native(ui_amount: float, decimals: float) -> int:
+    #         return int(ui_amount * 10 ** decimals)
+    #
+    #     def ui_price_to_lots(perp_market: PerpMarket, price: float) -> int:
+    #         return int(to_native(price, quote_decimals) * perp_market.base_lot_size / (perp_market.quote_lot_size * 10 ** perp_market.base_decimals))
+    #
+    #     def ui_base_to_lots(perp_market: PerpMarket, size: float) -> int:
+    #         return int(to_native(size, perp_market.base_decimals) // perp_market.base_lot_size)
+    #
+    #     perp_place_order_args: PerpPlaceOrderArgs = {
+    #         'side': {'bids': Bid, 'asks': Ask}[side],
+    #         'price_lots': ui_price_to_lots(perp_market, price),
+    #         'max_base_lots': ui_base_to_lots(perp_market, size),
+    #         'max_quote_lots': sys.maxsize,
+    #         'client_order_id': int(time.time() * 1e3),
+    #         'order_type': place_order_type.Limit(),
+    #         'reduce_only': False,
+    #         'expiry_timestamp': 0,
+    #         'limit': 10
+    #     }
+    #
+    #     perp_place_order_accounts: PerpPlaceOrderAccounts = {
+    #         'group': perp_market.group,
+    #         'account': PublicKey(self.mango_account_pk),
+    #         'owner': self.provider.wallet.public_key,
+    #         'perp_market': PublicKey(perp_market_config['publicKey']),
+    #         'bids': perp_market.bids,
+    #         'asks': perp_market.asks,
+    #         'event_queue': perp_market.event_queue,
+    #         'oracle': perp_market.oracle
+    #     }
+    #
+    #     remaining_accounts = self._health_remaining_accounts('fixed', [[bank for bank in self.banks if bank.token_index == 0][0]], [perp_market])
+    #
+    #     perp_place_order_ix = perp_place_order(
+    #         perp_place_order_args,
+    #         perp_place_order_accounts,
+    #         remaining_accounts=remaining_accounts
+    #     )
+    #
+    #     return perp_place_order_ix
+    #
+    # async def place_order(
+    #     self,
+    #     symbol: str,
+    #     side: Literal['bids', 'asks'],
+    #     price: float,
+    #     size: float
+    # ):
+    #     market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
+    #
+    #     match market_type:
+    #         case 'spot':
+    #             serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
+    #
+    #             serum_market_index = serum_market_config['marketIndex']
+    #
+    #             try:
+    #                 serum3 = [serum3 for serum3 in self.mango_account.serum3 if serum3.market_index == serum_market_index][0]
+    #             except IndexError:
+    #                 logging.error(f"Open orders account for {symbol} not found, creating one...")
+    #
+    #                 serum3_create_open_orders_ix = self.make_serum3_create_open_orders_ix('SOL/USDC')
+    #
+    #                 recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
+    #
+    #                 tx = Transaction()
+    #
+    #                 tx.recent_blockhash = str(recent_blockhash)
+    #
+    #                 tx.add(serum3_create_open_orders_ix)
+    #
+    #                 tx.sign(self.provider.wallet.payer)
+    #
+    #                 response = await self.provider.send(tx)
+    #
+    #                 logging.error(f"Waiting for Open Orders account creation confirmation...")
+    #
+    #                 await self.provider.connection.confirm_transaction(response)
+    #
+    #                 logging.error(f"Open orders account created for {symbol}.")
+    #
+    #                 self.mango_account = await MangoAccount.fetch(
+    #                     self.provider.connection,
+    #                     PublicKey(self.mango_account_pk)
+    #                 )
+    #
+    #             serum3_place_order_ix = self.make_serum3_place_order_ix(
+    #                 symbol,
+    #                 side,
+    #                 price,
+    #                 size
+    #             )
+    #
+    #             tx = Transaction()
+    #
+    #             recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
+    #
+    #             tx.recent_blockhash = str(recent_blockhash)
+    #
+    #             tx.add(serum3_place_order_ix)
+    #
+    #             tx.sign(self.provider.wallet.payer)
+    #
+    #             response = await self.provider.send(tx)
+    #
+    #             return response
+    #         case 'perpetual':
+    #             tx = Transaction()
+    #
+    #             recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
+    #
+    #             tx.recent_blockhash = str(recent_blockhash)
+    #
+    #             perp_place_order_ix = self.make_perp_place_order_ix(symbol, side, price, size)
+    #
+    #             tx.add(perp_place_order_ix)
+    #
+    #             tx.sign(self.provider.wallet.payer)
+    #
+    #             response = await self.provider.send(tx)
+    #
+    #             return response
+    #
+    # def make_serum3_cancel_all_orders_ix(self, symbol: str):
+    #     serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
+    #
+    #     serum_market_index = serum_market_config['marketIndex']
+    #
+    #     serum_market = [
+    #         serum_market
+    #         for serum_market in self.serum_markets
+    #         if serum_market.market_index == serum_market_index
+    #     ][0]
+    #
+    #     try:
+    #         serum3 = [serum3 for serum3 in self.mango_account.serum3 if serum3.market_index == serum_market_index][0]
+    #     except IndexError as error:
+    #         print(error)
+    #
+    #     serum_market_external = [
+    #         serum_market_external
+    #         for serum_market_external in self.serum_markets_external
+    #         if serum_market_external.state.public_key() == serum_market.serum_market_external
+    #     ][0]
+    #
+    #     serum3_cancel_all_orders_args: Serum3CancelAllOrdersArgs = {
+    #         'limit': 10
+    #     }
+    #
+    #     serum3_cancel_all_orders_accounts: Serum3CancelAllOrdersAccounts = {
+    #         'group': self.mango_account.group,
+    #         'account': PublicKey(self.mango_account_pk),
+    #         'owner': self.provider.wallet.public_key,
+    #         'open_orders': serum3.open_orders,
+    #         'serum_market': PublicKey(serum_market_config['publicKey']),
+    #         'serum_program': serum_market.serum_program,
+    #         'serum_market_external': serum_market.serum_market_external,
+    #         'market_bids': serum_market_external.state.bids(),
+    #         'market_asks': serum_market_external.state.asks(),
+    #         'market_event_queue': serum_market_external.state.event_queue()
+    #     }
+    #
+    #     serum3_cancel_all_orders_ix = serum3_cancel_all_orders(
+    #         serum3_cancel_all_orders_args,
+    #         serum3_cancel_all_orders_accounts
+    #     )
+    #
+    #     return serum3_cancel_all_orders_ix
+    #
+    # def make_perp_cancel_all_orders_ix(self, symbol: str):
+    #     perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
+    #
+    #     perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
+    #
+    #     perp_cancel_all_orders_args: PerpCancelAllOrdersArgs = {
+    #         'limit': 10
+    #     }
+    #
+    #     perp_cancel_all_orders_accounts: PerpCancelAllOrdersAccounts = {
+    #         'group': perp_market.group,
+    #         'account': PublicKey(self.mango_account_pk),
+    #         'owner': self.provider.wallet.public_key,
+    #         'perp_market': PublicKey(perp_market_config['publicKey']),
+    #         'bids': perp_market.bids,
+    #         'asks': perp_market.asks
+    #     }
+    #
+    #     perp_cancel_all_orders_ix = perp_cancel_all_orders(perp_cancel_all_orders_args, perp_cancel_all_orders_accounts)
+    #
+    #     return perp_cancel_all_orders_ix
+    #
+    # async def cancel_all_orders(self, symbol: str):
+    #     market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
+    #
+    #     match market_type:
+    #         case 'spot':
+    #             tx = Transaction()
+    #
+    #             recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
+    #
+    #             tx.recent_blockhash = str(recent_blockhash)
+    #
+    #             serum3_cancel_all_orders_ix = self.make_serum3_cancel_all_orders_ix(symbol)
+    #
+    #             tx.add(serum3_cancel_all_orders_ix)
+    #
+    #             tx.sign(self.provider.wallet.payer)
+    #
+    #             response = await self.provider.send(tx)
+    #
+    #             return response
+    #         case 'perpetual':
+    #             tx = Transaction()
+    #
+    #             recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
+    #
+    #             tx.recent_blockhash = str(recent_blockhash)
+    #
+    #             perp_cancel_all_orders_ix = self.make_perp_cancel_all_orders_ix(symbol)
+    #
+    #             tx.add(perp_cancel_all_orders_ix)
+    #
+    #             tx.sign(self.provider.wallet.payer)
+    #
+    #             response = await self.provider.send(tx)
+    #
+    #             return response
+    #
+    # async def balances(self):
+    #     # TODO: Clean up this mess
+    #     return [
+    #         {
+    #             'symbol': meta['symbol'],
+    #             'balance': float(
+    #                 meta['token_indexed_position'] * (
+    #                     meta['bank_deposit_index'] if meta['token_indexed_position'] > 0
+    #                     else meta['bank_borrow_index']
+    #                 )
+    #                 /
+    #                 meta['bank_mint_decimals']
+    #             )
+    #         }
+    #         for meta in
+    #         [
+    #             {
+    #                 'symbol': token_config['symbol'],
+    #                 'token_indexed_position': Decimal(token.indexed_position.val) / divider,
+    #                 'bank_mint_decimals': 10 ** bank.mint_decimals,
+    #                 'bank_deposit_index': Decimal(bank.deposit_index.val) / divider,
+    #                 'bank_borrow_index': Decimal(bank.borrow_index.val) / divider,
+    #             }
+    #             for token, bank, token_config, divider in
+    #             [
+    #                 [
+    #                     token,
+    #                     [bank for bank in self.banks if bank.token_index == token.token_index][0],
+    #                     [token_config for token_config in self.group_config['tokens'] if token_config['tokenIndex'] == token.token_index][0],
+    #                     Decimal(2 ** (8 * 6))
+    #                 ]
+    #                 for token in self.mango_account.tokens
+    #                 if token.token_index != 65535
+    #             ]
+    #         ]
+    #     ]
+    #
+    # def make_place_perp_pegged_order_ix(
+    #     self,
+    #     symbol: str,
+    #     side: Literal['bids', 'asks'],
+    #     price_offset: float,
+    #     peg_limit: float,
+    #     quantity: float,
+    #     max_quote_quantity: float = None,
+    #     client_order_id: int = int(time.time()),
+    #     expiry_timestamp: int = 0,
+    #     limit: int = 10,
+    #     reduce_only: bool = False
+    # ):
+    #     perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
+    #
+    #     perp_market: PerpMarket = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
+    #
+    #     perp_place_order_pegged_args: PerpPlaceOrderPeggedArgs = {
+    #         'side': {'bids': Bid, 'asks': Ask}[side],
+    #         'price_offset_lots': perp_market.ui_price_to_lots(price_offset),
+    #         'peg_limit': perp_market.ui_price_to_lots(peg_limit),
+    #         'max_base_lots': perp_market.ui_base_to_lots(quantity),
+    #         'max_quote_lots': perp_market.ui_quote_to_lots(max_quote_quantity) if max_quote_quantity else RUST_I64_MAX,
+    #         'client_order_id': client_order_id,
+    #         'order_type': Limit,
+    #         'reduce_only': reduce_only,
+    #         'expiry_timestamp': expiry_timestamp,
+    #         'limit': limit,
+    #         'max_oracle_staleness_slots': -1
+    #     }
+    #
+    #     perp_place_order_pegged_accounts: PerpPlaceOrderPeggedAccounts = {
+    #         'group': PublicKey(self.group_config['publicKey']),
+    #         'account': PublicKey(self.mango_account_pk),
+    #         'owner': self.mango_account.owner,
+    #         'perp_market': PublicKey(perp_market_config['publicKey']),
+    #         'bids': perp_market.bids,
+    #         'asks': perp_market.asks,
+    #         'event_queue': perp_market.event_queue,
+    #         'oracle': perp_market.oracle
+    #     }
+    #
+    #     remaining_accounts = self._health_remaining_accounts(
+    #         'fixed',
+    #         [bank for bank in self.banks if bank.token_index == 0],
+    #         [perp_market]
+    #     )
+    #
+    #     return perp_place_order_pegged(
+    #         perp_place_order_pegged_args,
+    #         perp_place_order_pegged_accounts,
+    #         remaining_accounts=remaining_accounts
+    #     )
+    #
+    # async def place_perp_pegged_order(
+    #     self,
+    #     symbol: str,
+    #     side: Literal['bids', 'asks'],
+    #     price_offset: float,
+    #     peg_limit: float,
+    #     quantity: float,
+    #     max_quote_quantity: float = None,
+    #     client_order_id: int = int(time.time()),
+    #     expiry_timestamp: int = 0,
+    #     limit: int = 10,
+    #     reduce_only: bool = False
+    # ):
+    #     tx = Transaction()
+    #
+    #     recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
+    #
+    #     tx.recent_blockhash = str(recent_blockhash)
+    #
+    #     tx.add(
+    #         self.make_place_perp_pegged_order_ix(
+    #             symbol,
+    #             side,
+    #             price_offset,
+    #             peg_limit,
+    #             quantity,
+    #             max_quote_quantity,
+    #             client_order_id,
+    #             expiry_timestamp,
+    #             limit,
+    #             reduce_only
+    #         )
+    #     )
+    #
+    #     tx.sign(self.provider.wallet.payer)
+    #
+    #     response = await self.provider.send(tx)
+    #
+    #     return response
+    #
+    # async def equity(self):
+    #     oracle_price_by_token_index = {}
+    #
+    #     oracle_price_by_oracle_pk = {}
+    #
+    #     for bank, raw_oracle in zip(
+    #         self.banks,
+    #         await asyncio.gather(*[self.provider.connection.get_account_info(bank.oracle) for bank in self.banks])
+    #     ):
+    #         name = bytes(bank.name).decode().strip('\x00')
+    #
+    #         if name == 'USDC':
+    #             oracle_price = 1
+    #         else:
+    #             # TODO: Handle MNGO's oracle (not Pyth)
+    #
+    #             oracle = pyth.PRICE.parse(raw_oracle.value.data)
+    #
+    #             oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
+    #
+    #         oracle_price_by_token_index[bank.token_index] = oracle_price
+    #
+    #         oracle_price_by_oracle_pk[bank.oracle] = oracle_price
+    #
+    #     balance_by_token_index = {}
+    #
+    #     for token, bank in [
+    #         (
+    #             token,
+    #             [bank for bank in self.banks if bank.token_index == token.token_index][0]
+    #         )
+    #         for token in filter(TokenPositionHelper.is_active, self.mango_account.tokens)
+    #     ]:
+    #         oracle_price = oracle_price_by_token_index[token.token_index]
+    #
+    #         balance_by_token_index[token.token_index] = Decimal(str(TokenPositionHelper.balance(token, bank))) * oracle_price
+    #
+    #     active_open_orders = [open_orders for open_orders in self.mango_account.serum3 if Serum3OrdersHelper.is_active(open_orders)]
+    #
+    #     for open_orders, open_orders_external in zip(
+    #         active_open_orders,
+    #         await asyncio.gather(*[
+    #             AsyncOpenOrdersAccount.load(self.provider.connection, str(open_orders.open_orders))
+    #             for open_orders
+    #             in active_open_orders
+    #         ])
+    #     ):
+    #         # TODO: Account for referrerRebatesAccrued - this isn't available yet in pyserum
+    #
+    #         balance_by_token_index[open_orders.base_token_index] += open_orders_external.base_token_total * oracle_price_by_token_index[open_orders.base_token_index]
+    #
+    #     token_equity = sum(balance_by_token_index.values())
+    #
+    #     perp_equity = sum([
+    #         PerpPositionHelper.equity(perp_position, perp_market, oracle_price_by_oracle_pk[perp_market.oracle])
+    #         for perp_position, perp_market in [
+    #             (
+    #                 perp_position,
+    #                 [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_position.market_index][0]
+    #             )
+    #             for perp_position in self.mango_account.perps
+    #             if PerpPositionHelper.is_active(perp_position)
+    #         ]
+    #     ])
+    #
+    #     return token_equity + perp_equity
+    #
+    # async def health_ratio(self, health_type: Literal['init', 'maint', 'liquidation_end']):
+    #     health_type: HealthTypeKind = {
+    #         'init': Init(),
+    #         'maint': Maint(),
+    #         'liquidation_end': LiquidationEnd()
+    #     }[health_type]
+    #
+    #     # Build the health cache
+    #
+    #     token_positions = [
+    #         token_position
+    #         for token_position in self.mango_account.tokens
+    #         if token_position.token_index != 65535
+    #     ]
+    #
+    #     banks = [
+    #         [bank for bank in self.banks if bank.token_index == token_position.token_index][0]
+    #         for token_position in token_positions
+    #     ]
+    #
+    #     raw_oracles = await self.provider.connection.get_multiple_accounts([bank.oracle for bank in banks])
+    #
+    #     def oracle_price_from_account_info(account: Account):
+    #         match str(account.owner):
+    #             case 'FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH': # Pyth
+    #                 oracle = pyth.PRICE.parse(account.data)
+    #
+    #                 return oracle.agg.price * (Decimal(10) ** oracle.expo)
+    #             case '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg': # For now it's always USDC
+    #                 return Decimal(1)
+    #
+    #     oracle_prices = [
+    #         oracle_price_from_account_info(account)
+    #         for account in raw_oracles.value
+    #     ]
+    #
+    #     token_infos = [
+    #         TokenInfo(
+    #             bank.token_index,
+    #             bank.maint_asset_weight,
+    #             bank.init_asset_weight,
+    #             BankHelper.scaled_init_asset_weight(bank, PricesHelper.liab(prices, Init())),
+    #             bank.maint_liab_weight,
+    #             bank.init_liab_weight,
+    #             BankHelper.scaled_init_liab_weight(bank, PricesHelper.liab(prices, Init())),
+    #             prices,
+    #             I80F48.from_decimal(TokenPositionHelper.balance(token_position, bank))
+    #         )
+    #         for bank, token_position, prices
+    #         in zip(
+    #             banks,
+    #             token_positions,
+    #             [
+    #                 Prices(
+    #                     oracle=I80F48.from_decimal(oracle_price * Decimal(10 ** (6 - bank.mint_decimals))),
+    #                     stable=I80F48.from_decimal(Decimal(bank.stable_price_model.stable_price))
+    #                 )
+    #                 for bank, oracle_price in zip(banks, oracle_prices)
+    #             ]
+    #         )
+    #     ]
+    #
+    #     serum3_infos = []
+    #
+    #     for open_orders, open_orders_external in zip(
+    #             MangoAccountHelper.active_serum3_orders(self.mango_account),
+    #             await asyncio.gather(*[
+    #                 AsyncOpenOrdersAccount.load(self.provider.connection, str(open_orders.open_orders))
+    #                 for open_orders
+    #                 in MangoAccountHelper.active_serum3_orders(self.mango_account)
+    #             ])
+    #     ):
+    #         base_index, base_info = [
+    #             (index, token_info)
+    #             for index, token_info in enumerate(token_infos)
+    #             if token_info.token_index == open_orders.base_token_index
+    #         ][0]
+    #
+    #         if not base_info:
+    #             raise ValueError(f"Base token info not found for market index {open_orders.market_index}")
+    #
+    #         quote_index, quote_info = [
+    #             (index, token_info)
+    #             for index, token_info in enumerate(token_infos)
+    #             if token_info.token_index == open_orders.quote_token_index
+    #         ][0]
+    #
+    #         if not quote_info:
+    #             raise ValueError(f"Quote token info not found for market index {open_orders.market_index}")
+    #
+    #         reserved_base = open_orders_external.base_token_total - open_orders_external.base_token_free
+    #
+    #         reserved_quote = open_orders_external.quote_token_total - open_orders_external.quote_token_free
+    #
+    #         serum3_infos.append(
+    #             Serum3Info(
+    #                 reserved_base=I80F48.from_decimal(Decimal(reserved_base)),
+    #                 reserved_quote=I80F48.from_decimal(Decimal(reserved_quote)),
+    #                 base_index=base_index,
+    #                 quote_index=quote_index,
+    #                 market_index=open_orders.market_index,
+    #                 has_zero_funds=False
+    #             )
+    #         )
+    #
+    #     perp_positions = MangoAccountHelper.active_perp_positions(self.mango_account)
+    #
+    #     perp_markets = [
+    #         [
+    #             perp_market
+    #             for perp_market in self.perp_markets
+    #             if perp_market.perp_market_index == perp_position.market_index
+    #         ][0]
+    #         for perp_position in perp_positions
+    #
+    #     ]
+    #
+    #     perp_market_oracle_prices = [
+    #         oracle_price_from_account_info(raw_oracle)
+    #         for raw_oracle in (await self.provider.connection.get_multiple_accounts([perp_market.oracle for perp_market in perp_markets])).value
+    #     ]
+    #
+    #     perp_infos = []
+    #
+    #     for perp_position, perp_market, perp_market_oracle_price in zip(
+    #         perp_positions,
+    #         perp_markets,
+    #         perp_market_oracle_prices
+    #     ):
+    #         base_lots = perp_position.base_position_lots + perp_position.taker_base_lots
+    #
+    #         unsettled_funding = PerpPositionHelper.unsettled_funding(perp_position, perp_market)
+    #
+    #         taker_quote = perp_position.taker_quote_lots * perp_market.quote_lot_size
+    #
+    #         quote_current = I80F48.from_decimal(perp_position.quote_position_native.to_decimal() - unsettled_funding + Decimal(taker_quote))
+    #
+    #         perp_info = PerpInfo(
+    #             perp_market.perp_market_index,
+    #             perp_market.maint_base_asset_weight,
+    #             perp_market.init_base_asset_weight,
+    #             perp_market.maint_base_liab_weight,
+    #             perp_market.init_base_liab_weight,
+    #             perp_market.maint_overall_asset_weight,
+    #             perp_market.init_overall_asset_weight,
+    #             perp_market.base_lot_size,
+    #             base_lots,
+    #             perp_position.bids_base_lots,
+    #             perp_position.asks_base_lots,
+    #             quote_current,
+    #             Prices(
+    #                 oracle=I80F48.from_decimal(perp_market_oracle_price * Decimal(10 ** (6 - perp_market.base_decimals))),
+    #                 stable=I80F48.from_decimal(Decimal(perp_market.stable_price_model.stable_price))
+    #             ),
+    #             PerpPositionHelper.has_open_orders(perp_position),
+    #             PerpPositionHelper.has_open_fills(perp_position)
+    #         )
+    #
+    #         perp_infos.append(perp_info)
+    #
+    #     health_cache = HealthCache(
+    #         token_infos,
+    #         serum3_infos,
+    #         perp_infos,
+    #         False
+    #     )
+    #
+    #     assets = 0
+    #
+    #     liabs = 0
+    #
+    #     for token_info in health_cache.token_infos:
+    #         contrib = TokenInfoHelper.health_contribution(token_info, health_type)
+    #
+    #         if contrib > 0:
+    #             assets += contrib
+    #         else:
+    #             liabs -= contrib
+    #
+    #     def get_serum3_reservations(health_type: HealthTypeKind):
+    #         token_max_reserved = [0 for _ in range(0, len(token_infos))]
+    #
+    #         serum3_reserved: [Serum3Reserved] = []
+    #
+    #         for serum3_info in serum3_infos:
+    #             quote, base = token_infos[serum3_info.quote_index], token_infos[serum3_info.base_index]
+    #
+    #             reserved_base, reserved_quote = serum3_info.reserved_base.to_decimal(), serum3_info.reserved_quote.to_decimal()
+    #
+    #             quote_asset = PricesHelper.asset(quote.prices, health_type)
+    #
+    #             base_liab = PricesHelper.liab(base.prices, health_type)
+    #
+    #             all_reserved_as_base = reserved_base + reserved_quote * quote_asset / base_liab
+    #
+    #             base_asset = PricesHelper.asset(base.prices, health_type)
+    #
+    #             quote_liab = PricesHelper.liab(quote.prices, health_type)
+    #
+    #             all_reserved_as_quote = reserved_quote + reserved_base * base_asset / quote_liab
+    #
+    #             token_max_reserved[serum3_info.base_index] += all_reserved_as_base
+    #
+    #             token_max_reserved[serum3_info.quote_index] += all_reserved_as_quote
+    #
+    #             serum3_reserved.append(Serum3Reserved(all_reserved_as_base, all_reserved_as_quote))
+    #
+    #         return {
+    #             'token_max_reserved': token_max_reserved,
+    #             'serum3_reserved': serum3_reserved
+    #         }
+    #
+    #     res = get_serum3_reservations(Maint())
+    #
+    #     for index, serum3_info in enumerate(serum3_infos):
+    #         contrib = Serum3InfoHelper.health_contribution(
+    #             serum3_info,
+    #             health_type,
+    #             health_cache.token_infos,
+    #             res['token_max_reserved'],
+    #             res['serum3_reserved'][index]
+    #         ).to_decimal()
+    #
+    #         if contrib > 0:
+    #             assets += contrib
+    #         else:
+    #             liabs -= contrib
+    #
+    #     for perp_info in health_cache.perp_infos:
+    #         contrib = PerpInfoHelper.health_contribution(perp_info, health_type).to_decimal()
+    #
+    #         if contrib > 0:
+    #             assets += contrib
+    #         else:
+    #             liabs -= contrib
+    #
+    #     if liabs > 0.001:
+    #         return 100 * (assets - liabs) / liabs
+    #     else:
+    #         return sys.maxsize

@@ -1,8 +1,5 @@
 import argparse
 import asyncio
-import json
-import pathlib
-from solana.publickey import PublicKey
 
 from mango_explorer_v4.mango_client import MangoClient
 
@@ -24,12 +21,7 @@ async def main():
 
     args = parser.parse_args()
 
-    config = json.load(open(pathlib.Path(__file__).parent.parent / 'config.json'))
-
-    mango_client = await MangoClient.connect(
-        secret_key=config['secret_key'],
-        mango_account_pk=config['mango_account_pk']
-    )
+    mango_client = await MangoClient.connect()
 
     async for message in mango_client.incremental_fills(args.symbol):
         for fill in message['fills']:
