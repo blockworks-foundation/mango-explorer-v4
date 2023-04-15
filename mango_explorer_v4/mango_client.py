@@ -637,7 +637,7 @@ class MangoClient():
 
         return serum3_create_open_orders_ix
 
-    def make_serum3_place_order_ix(self, symbol: str, side: Literal['bids', 'asks'], price: float, size: float, mango_account: MangoAccount):
+    def make_serum3_place_order_ix(self, mango_account: MangoAccount, symbol: str, side: Literal['bids', 'asks'], price: float, size: float):
         serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
 
         serum_market_index = serum_market_config['marketIndex']
@@ -825,11 +825,11 @@ class MangoClient():
                     logging.error(f"Open orders account created for {symbol}: {response}. Please re-launch the program.")
 
                 serum3_place_order_ix = self.make_serum3_place_order_ix(
+                    mango_account,
                     symbol,
                     side,
                     price,
-                    size,
-                    mango_account
+                    size
                 )
 
                 tx = Transaction()
@@ -854,7 +854,7 @@ class MangoClient():
 
                 return response
 
-    def make_serum3_cancel_all_orders_ix(self, symbol: str, mango_account: MangoAccount):
+    def make_serum3_cancel_all_orders_ix(self, mango_account: MangoAccount, symbol: str):
         serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
 
         serum_market_index = serum_market_config['marketIndex']
@@ -931,7 +931,7 @@ class MangoClient():
 
                 recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
 
-                serum3_cancel_all_orders_ix = self.make_serum3_cancel_all_orders_ix(symbol, mango_account)
+                serum3_cancel_all_orders_ix = self.make_serum3_cancel_all_orders_ix(mango_account, symbol)
 
                 tx.add(serum3_cancel_all_orders_ix)
 
