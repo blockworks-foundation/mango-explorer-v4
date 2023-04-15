@@ -848,7 +848,7 @@ class MangoClient():
 
                 return response
 
-    def make_serum3_cancel_all_orders_ix(self, symbol: str):
+    def make_serum3_cancel_all_orders_ix(self, symbol: str, mango_account: MangoAccount):
         serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
 
         serum_market_index = serum_market_config['marketIndex']
@@ -860,7 +860,7 @@ class MangoClient():
         ][0]
 
         try:
-            serum3 = [serum3 for serum3 in self.mango_account.serum3 if serum3.market_index == serum_market_index][0]
+            serum3 = [serum3 for serum3 in mango_account.serum3 if serum3.market_index == serum_market_index][0]
         except IndexError as error:
             print(error)
 
@@ -875,9 +875,9 @@ class MangoClient():
         }
 
         serum3_cancel_all_orders_accounts: Serum3CancelAllOrdersAccounts = {
-            'group': self.mango_account.group,
-            'account': PublicKey(self.mango_account_pk),
-            'owner': self.provider.wallet.public_key,
+            'group': mango_account.group,
+            'account': mango_account.public_key,
+            'owner': mango_account.owner,
             'open_orders': serum3.open_orders,
             'serum_market': PublicKey(serum_market_config['publicKey']),
             'serum_program': serum_market.serum_program,
@@ -894,7 +894,7 @@ class MangoClient():
 
         return serum3_cancel_all_orders_ix
 
-    def make_perp_cancel_all_orders_ix(self, symbol: str):
+    def make_perp_cancel_all_orders_ix(self, symbol: str, mango_account: MangoAccount):
         perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
         perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
@@ -905,8 +905,8 @@ class MangoClient():
 
         perp_cancel_all_orders_accounts: PerpCancelAllOrdersAccounts = {
             'group': perp_market.group,
-            'account': PublicKey(self.mango_account_pk),
-            'owner': self.provider.wallet.public_key,
+            'account': mango_account.public_key,
+            'owner': mango_account.owner,
             'perp_market': PublicKey(perp_market_config['publicKey']),
             'bids': perp_market.bids,
             'asks': perp_market.asks
@@ -916,40 +916,34 @@ class MangoClient():
 
         return perp_cancel_all_orders_ix
 
-    async def cancel_all_orders(self, symbol: str):
+    async def cancel_all_orders(self, symbol: str, mango_account: MangoAccount, keypair: Keypair):
         market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
 
         match market_type:
             case 'spot':
                 tx = Transaction()
 
-                recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
+                recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
 
-                tx.recent_blockhash = str(recent_blockhash)
-
-                serum3_cancel_all_orders_ix = self.make_serum3_cancel_all_orders_ix(symbol)
+                serum3_cancel_all_orders_ix = self.make_serum3_cancel_all_orders_ix(symbol, mango_account)
 
                 tx.add(serum3_cancel_all_orders_ix)
 
-                tx.sign(self.provider.wallet.payer)
-
-                response = await self.provider.send(tx)
+                response = await self.connection.send_transaction(tx, keypair, recent_blockhash=recent_blockhash)
 
                 return response
             case 'perpetual':
                 tx = Transaction()
 
-                recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
+                recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
 
                 tx.recent_blockhash = str(recent_blockhash)
 
-                perp_cancel_all_orders_ix = self.make_perp_cancel_all_orders_ix(symbol)
+                perp_cancel_all_orders_ix = self.make_perp_cancel_all_orders_ix(symbol, mango_account)
 
                 tx.add(perp_cancel_all_orders_ix)
 
-                tx.sign(self.provider.wallet.payer)
-
-                response = await self.provider.send(tx)
+                response = await self.connection.send_transaction(tx, keypair, recent_blockhash=recent_blockhash)
 
                 return response
 

@@ -3,7 +3,7 @@ import asyncio
 import json
 import pathlib
 
-import base58
+from base58 import b58decode
 from solana.keypair import Keypair
 
 from mango_explorer_v4.mango_client import MangoClient
@@ -39,7 +39,7 @@ async def main():
 
     mango_client = await MangoClient.connect()
 
-    keypair = Keypair.from_secret_key(base58.b58decode(config['secret_key']))
+    keypair = Keypair.from_secret_key(b58decode(config['secret_key']))
 
     mango_account = await mango_client.get_mango_account(config['mango_account_pk'])
 
