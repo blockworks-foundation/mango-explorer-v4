@@ -7,14 +7,21 @@ from mango_explorer_v4.mango_client import MangoClient
 
 
 async def main():
-    config = json.load(open(pathlib.Path(__file__).parent.parent / 'config.json'))
+    parser = argparse.ArgumentParser()
 
-    mango_client = await MangoClient.connect(
-        secret_key=config['secret_key'],
-        mango_account_pk=config['mango_account_pk']
+    parser.add_argument(
+        '--mango-account',
+        help='Mango account primary key.',
+        required=True
     )
 
-    print(await mango_client.equity())
+    args = parser.parse_args()
+
+    mango_client = await MangoClient.connect()
+
+    mango_account = await mango_client.get_mango_account(args.mango_account)
+
+    print(await mango_client.equity(mango_account))
 
 
 if __name__ == '__main__':

@@ -486,6 +486,15 @@ class MangoClient():
                             lead = fills[-1:][0].seq_num
 
     async def funding_rate(self, symbol: str):
+        """
+
+        Returns instantaneous funding rate for the day: funding is continuously
+        applied on every interaction with a perp position. The rate is further
+        multiplied by the time elapsed since it was last applied (capped to max. 1hr).
+
+        :param symbol:
+        :return: instantaneous funding rate in % form
+        """
         perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
         perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
@@ -517,10 +526,7 @@ class MangoClient():
         else:
             funding = 0
 
-        return {
-            'symbol': symbol,
-            'funding_rate': funding / 24 / 10 ** QUOTE_DECIMALS
-        }
+        return funding * 100
 
     async def get_mango_account(self, public_key: str): return await MangoAccount.fetch(self.connection, PublicKey(public_key))
 
@@ -986,6 +992,7 @@ class MangoClient():
 
     def make_place_perp_pegged_order_ix(
         self,
+        mango_account: MangoAccount,
         symbol: str,
         side: Literal['bids', 'asks'],
         price_offset: float,
@@ -1003,10 +1010,10 @@ class MangoClient():
 
         perp_place_order_pegged_args: PerpPlaceOrderPeggedArgs = {
             'side': {'bids': Bid, 'asks': Ask}[side],
-            'price_offset_lots': perp_market.ui_price_to_lots(price_offset),
-            'peg_limit': perp_market.ui_price_to_lots(peg_limit),
-            'max_base_lots': perp_market.ui_base_to_lots(quantity),
-            'max_quote_lots': perp_market.ui_quote_to_lots(max_quote_quantity) if max_quote_quantity else RUST_I64_MAX,
+            'price_offset_lots': PerpMarketHelper.ui_price_to_lots(perp_market, price_offset),
+            'peg_limit': PerpMarketHelper.ui_price_to_lots(perp_market, peg_limit),
+            'max_base_lots': PerpMarketHelper.ui_base_to_lots(perp_market, quantity),
+            'max_quote_lots': PerpMarketHelper.ui_quote_to_lots(perp_market, max_quote_quantity) if max_quote_quantity else RUST_I64_MAX,
             'client_order_id': client_order_id,
             'order_type': Limit,
             'reduce_only': reduce_only,
@@ -1017,8 +1024,8 @@ class MangoClient():
 
         perp_place_order_pegged_accounts: PerpPlaceOrderPeggedAccounts = {
             'group': PublicKey(self.group_config['publicKey']),
-            'account': PublicKey(self.mango_account_pk),
-            'owner': self.mango_account.owner,
+            'account': mango_account.public_key,
+            'owner': mango_account.owner,
             'perp_market': PublicKey(perp_market_config['publicKey']),
             'bids': perp_market.bids,
             'asks': perp_market.asks,
@@ -1029,7 +1036,8 @@ class MangoClient():
         remaining_accounts = self._health_remaining_accounts(
             'fixed',
             [bank for bank in self.banks if bank.token_index == 0],
-            [perp_market]
+            [perp_market],
+            mango_account
         )
 
         return perp_place_order_pegged(
@@ -1040,6 +1048,8 @@ class MangoClient():
 
     async def place_perp_pegged_order(
         self,
+        mango_account: MangoAccount,
+        keypair: Keypair,
         symbol: str,
         side: Literal['bids', 'asks'],
         price_offset: float,
@@ -1053,12 +1063,11 @@ class MangoClient():
     ):
         tx = Transaction()
 
-        recent_blockhash = (await self.provider.connection.get_latest_blockhash()).value.blockhash
-
-        tx.recent_blockhash = str(recent_blockhash)
+        recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
 
         tx.add(
             self.make_place_perp_pegged_order_ix(
+                mango_account,
                 symbol,
                 side,
                 price_offset,
@@ -1072,20 +1081,18 @@ class MangoClient():
             )
         )
 
-        tx.sign(self.provider.wallet.payer)
-
-        response = await self.provider.send(tx)
+        response = await self.connection.send_transaction(tx, keypair, recent_blockhash=recent_blockhash)
 
         return response
 
-    async def equity(self):
+    async def equity(self, mango_account: MangoAccount):
         oracle_price_by_token_index = {}
 
         oracle_price_by_oracle_pk = {}
 
         for bank, raw_oracle in zip(
             self.banks,
-            await asyncio.gather(*[self.provider.connection.get_account_info(bank.oracle) for bank in self.banks])
+            await asyncio.gather(*[self.connection.get_account_info(bank.oracle) for bank in self.banks])
         ):
             name = bytes(bank.name).decode().strip('\x00')
 
@@ -1109,18 +1116,18 @@ class MangoClient():
                 token,
                 [bank for bank in self.banks if bank.token_index == token.token_index][0]
             )
-            for token in filter(TokenPositionHelper.is_active, self.mango_account.tokens)
+            for token in filter(TokenPositionHelper.is_active, mango_account.tokens)
         ]:
             oracle_price = oracle_price_by_token_index[token.token_index]
 
             balance_by_token_index[token.token_index] = Decimal(str(TokenPositionHelper.balance(token, bank))) * oracle_price
 
-        active_open_orders = [open_orders for open_orders in self.mango_account.serum3 if Serum3OrdersHelper.is_active(open_orders)]
+        active_open_orders = [open_orders for open_orders in mango_account.serum3 if Serum3OrdersHelper.is_active(open_orders)]
 
         for open_orders, open_orders_external in zip(
             active_open_orders,
             await asyncio.gather(*[
-                AsyncOpenOrdersAccount.load(self.provider.connection, str(open_orders.open_orders))
+                AsyncOpenOrdersAccount.load(self.connection, str(open_orders.open_orders))
                 for open_orders
                 in active_open_orders
             ])
@@ -1138,14 +1145,14 @@ class MangoClient():
                     perp_position,
                     [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_position.market_index][0]
                 )
-                for perp_position in self.mango_account.perps
+                for perp_position in mango_account.perps
                 if PerpPositionHelper.is_active(perp_position)
             ]
         ])
 
         return token_equity + perp_equity
 
-    async def health_ratio(self, health_type: Literal['init', 'maint', 'liquidation_end']):
+    async def health_ratio(self, mango_account: MangoAccount, health_type: Literal['init', 'maint', 'liquidation_end']):
         health_type: HealthTypeKind = {
             'init': Init(),
             'maint': Maint(),
@@ -1156,7 +1163,7 @@ class MangoClient():
 
         token_positions = [
             token_position
-            for token_position in self.mango_account.tokens
+            for token_position in mango_account.tokens
             if token_position.token_index != 65535
         ]
 
@@ -1165,7 +1172,7 @@ class MangoClient():
             for token_position in token_positions
         ]
 
-        raw_oracles = await self.provider.connection.get_multiple_accounts([bank.oracle for bank in banks])
+        raw_oracles = await self.connection.get_multiple_accounts([bank.oracle for bank in banks])
 
         def oracle_price_from_account_info(account: Account):
             match str(account.owner):
@@ -1210,11 +1217,11 @@ class MangoClient():
         serum3_infos = []
 
         for open_orders, open_orders_external in zip(
-                MangoAccountHelper.active_serum3_orders(self.mango_account),
+                MangoAccountHelper.active_serum3_orders(mango_account),
                 await asyncio.gather(*[
-                    AsyncOpenOrdersAccount.load(self.provider.connection, str(open_orders.open_orders))
+                    AsyncOpenOrdersAccount.load(self.connection, str(open_orders.open_orders))
                     for open_orders
-                    in MangoAccountHelper.active_serum3_orders(self.mango_account)
+                    in MangoAccountHelper.active_serum3_orders(mango_account)
                 ])
         ):
             base_index, base_info = [
@@ -1250,7 +1257,7 @@ class MangoClient():
                 )
             )
 
-        perp_positions = MangoAccountHelper.active_perp_positions(self.mango_account)
+        perp_positions = MangoAccountHelper.active_perp_positions(mango_account)
 
         perp_markets = [
             [
@@ -1264,7 +1271,7 @@ class MangoClient():
 
         perp_market_oracle_prices = [
             oracle_price_from_account_info(raw_oracle)
-            for raw_oracle in (await self.provider.connection.get_multiple_accounts([perp_market.oracle for perp_market in perp_markets])).value
+            for raw_oracle in (await self.connection.get_multiple_accounts([perp_market.oracle for perp_market in perp_markets])).value
         ]
 
         perp_infos = []
@@ -1311,6 +1318,8 @@ class MangoClient():
             perp_infos,
             False
         )
+
+        # Compute assets and liabilities
 
         assets = 0
 

@@ -8,6 +8,7 @@ MangoAccount:
 
 
 TODO:
+- Are unsettled balances being accounted for in equity?
 - Add unsettled funds to balances
 - Add SettleFunds instruction
 - Add total borrows, borrowable and APRs
