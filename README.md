@@ -14,7 +14,7 @@ pip install mango-explorer-v4
 
 ## Example usage
 
-Assuming that you have a SOL wallet already set up, visit https://app.mango.markets to create a Mango account and fund it so that you can place orders. You can find all available examples [here](./examples).
+Assuming that you have a SOL wallet already set up, visit https://app.mango.markets to create a Mango account and fund it so that you can place orders. You can find collection of example code [here](./examples).
 
 ```python
 import asyncio
@@ -75,3 +75,7 @@ async def main():
 
 asyncio.run(main())
 ```
+
+## Support
+
+Support is available on the [Mango Markets Discord server](https://discord.gg/8vs8uJJrcp) - post in the `#dev-discussion` channel for any questions or feature requests. 
