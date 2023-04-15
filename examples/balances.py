@@ -8,12 +8,11 @@ from mango_explorer_v4.mango_client import MangoClient
 async def main():
     config = json.load(open(pathlib.Path(__file__).parent.parent / 'config.json'))
 
-    mango_client = await MangoClient.connect(
-        secret_key=config['secret_key'],
-        mango_account_pk=config['mango_account_pk']
-    )
+    mango_client = await MangoClient.connect()
 
-    print(await mango_client.balances())
+    mango_account = await mango_client.get_mango_account(config['mango_account_pk'])
+
+    print(await mango_client.balances(mango_account))
 
     # [
     #   {'symbol': 'USDC', 'balance': 2.7435726906761744},

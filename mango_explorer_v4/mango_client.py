@@ -947,7 +947,7 @@ class MangoClient():
 
                 return response
 
-    async def balances(self):
+    async def balances(self, mango_account: MangoAccount):
         # TODO: Clean up this mess
         return [
             {
@@ -978,7 +978,7 @@ class MangoClient():
                         [token_config for token_config in self.group_config['tokens'] if token_config['tokenIndex'] == token.token_index][0],
                         Decimal(2 ** (8 * 6))
                     ]
-                    for token in self.mango_account.tokens
+                    for token in mango_account.tokens
                     if token.token_index != 65535
                 ]
             ]
