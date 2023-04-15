@@ -16,15 +16,25 @@ async def main():
         required=True
     )
 
-    args = parser.parse_args()
+    parser.add_argument(
+        '--mango-account',
+        help='Mango account primary key.',
+        required=True
+    )
 
-    config = json.load(open(pathlib.Path(__file__).parent.parent / 'config.json'))
+    parser.add_argument(
+        '--keypair',
+        help='Solana wallet private key, to sign transactions for the Mango account.',
+        required=True
+    )
+
+    args = parser.parse_args()
 
     mango_client = await MangoClient.connect()
 
-    keypair = Keypair.from_secret_key(b58decode(config['secret_key']))
+    mango_account = await mango_client.get_mango_account(args.mango_account)
 
-    mango_account = await mango_client.get_mango_account(config['mango_account_pk'])
+    keypair = Keypair.from_secret_key(b58decode(args.keypair))
 
     print(await mango_client.cancel_all_orders(args.symbol, mango_account, keypair))
 

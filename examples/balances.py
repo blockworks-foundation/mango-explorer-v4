@@ -1,7 +1,5 @@
-import asyncio
-import json
-import pathlib
 import argparse
+import asyncio
 
 from mango_explorer_v4.mango_client import MangoClient
 
@@ -16,8 +14,6 @@ async def main():
     )
 
     args = parser.parse_args()
-
-    config = json.load(open(pathlib.Path(__file__).parent.parent / 'config.json'))
 
     mango_client = await MangoClient.connect()
 

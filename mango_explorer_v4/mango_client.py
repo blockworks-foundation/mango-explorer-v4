@@ -1132,9 +1132,9 @@ class MangoClient():
                 in active_open_orders
             ])
         ):
-            # TODO: Account for referrerRebatesAccrued - this isn't available yet in pyserum
+            balance_by_token_index[open_orders.base_token_index] += ((open_orders_external.base_token_total) * oracle_price_by_token_index[open_orders.base_token_index] * Decimal(10 ** (6 - bank.mint_decimals))) / Decimal(1e6)
 
-            balance_by_token_index[open_orders.base_token_index] += open_orders_external.base_token_total * oracle_price_by_token_index[open_orders.base_token_index]
+            balance_by_token_index[open_orders.base_token_index] += (open_orders_external.quote_token_total * oracle_price_by_token_index[open_orders.quote_token_index]) / Decimal(1e6)
 
         token_equity = sum(balance_by_token_index.values())
 

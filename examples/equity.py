@@ -1,7 +1,5 @@
 import argparse
 import asyncio
-import json
-import pathlib
 
 from mango_explorer_v4.mango_client import MangoClient
 
