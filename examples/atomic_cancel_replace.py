@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 
+import solana.exceptions
 from base58 import b58decode
 from solana.keypair import Keypair
 from solana.transaction import Transaction
@@ -61,8 +62,10 @@ async def main():
 
     recent_blockhash = str((await mango_client.connection.get_latest_blockhash()).value.blockhash)
 
-    await mango_client.connection.send_transaction(tx, keypair, recent_blockhash=recent_blockhash)
-
+    try:
+        await mango_client.connection.send_transaction(tx, keypair, recent_blockhash=recent_blockhash); print(f"Quoted: {orders}")
+    except Exception as exception:
+        print(f"{exception}")
 
 if __name__ == '__main__':
     asyncio.run(main())

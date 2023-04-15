@@ -18,51 +18,49 @@ Assuming that you have a SOL wallet already set up, visit https://app.mango.mark
 
 ```python
 import asyncio
-from mango_explorer_v4 import MangoClient
+from mango_explorer_v4.mango_client import MangoClient
+from solana.keypair import Keypair
+from base58 import b58decode
 
 async def main():
-    mango_client = await MangoClient.connect(
-        secret_key='YOUR_SECRET_KEY',
-        # Can be the output from Phantom's "Export Private Key"
-        # Or the byte array output from solana-keygen, as [173,143,69,111 ... 109]
-        mango_account_pk='YOUR_MANGO_ACCOUNT_PK'
+    mango_client = await MangoClient.connect()
+    
+    # General data functions:
+    print(mango_client.symbols())
+    
+    print(await mango_client.orderbook_l2('SOL/USDC'))
+    
+    print(await mango_client.fills('SOL-PERP'))
+    
+    # It is possible to livestream both orderbook & fills, look for incremental_*.py in the examples folder
+
+    # Fill in your Mango account public key e.g 9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
+    mango_account = await mango_client.get_mango_account('PUBLIC_KEY')
+ 
+    print(await mango_client.balances(mango_account))
+    print(await mango_client.equity(mango_account))
+
+    # You can look up any Mango account using
+    # https://app.mango.markets/?address=9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
+    
+    # Fill in output from Phantom's "Export Private Key" e.g 2pvKRVh ... 1fL5qGq
+    keypair = Keypair.from_secret_key(b58decode('SECRET_KEY'))
+    
+    # Place a limit order
+    print(await mango_client.place_order(mango_account, keypair, 'SOL/USDC', 'bid', 10, 0.1, 'limit'))
+    
+    # Place an oracle pegged perp order: https://docs.mango.markets/mango-markets/oracle-peg-orders
+    print(
+        await mango_client.place_perp_pegged_order(
+            mango_account,
+            keypair,
+            'SOL-PERP',
+            'bid',
+            price_offset=-5, # Will always be $5 under oracle price
+            peg_limit=10, # If the oracle price moves $10 or more, the order will expire
+            quantity=1
+        )
     )
-
-    print(await mango_client.symbols())
-    # [
-    #   {
-    #       'name': 'SOL/USDC',
-    #       'baseCurrency': 'SOL',
-    #       'quoteCurrency': 'USDC',
-    #       'makerFees': -5e-05,
-    #       'takerFees': 0.0001
-    #   }
-    #   ...
-    # ]
-
-    print(await mango_client.place_order('SOL/USDC', 'bid', 10, 0.1, 'limit'))
-    # (Refresh the UI to see the newly opened order)
-
-    print(await mango_client.orderbook_l2('SOL/USDC', 3))
-    # {
-    #   'symbol': 'SOL/USDC',
-    #   'bids': [
-    #       [11.826, 0.899],
-    #       [11.824, 39.436],
-    #       [11.82, 316.421],
-    #    ],
-    #  'asks': [
-    #       [11.839, 0.78],
-    #       [11.84, 44.392],
-    #       [11.841, 1.1],
-    #   ]}
-
-    print(await mango_client.balances())
-    # [
-    #   {'symbol': 'USDC', 'balance': 2.7435726906761744},
-    #   {'symbol': 'SOL', 'balance': 0.1690007074236178},
-    #   ...
-    # ]
 
 asyncio.run(main())
 ```

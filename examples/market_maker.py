@@ -11,6 +11,10 @@ from mango_explorer_v4.mango_client import MangoClient
 
 
 async def main():
+    logging.basicConfig(
+        level=logging.INFO
+    )
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -58,7 +62,7 @@ async def main():
     while True:
         try:
             if state['recent_blockhash'] is None:
-                raise ValueError("Blockchash hasn't polled yet")
+                raise ValueError("Blockchash hasn't polled yet, skipping quote...")
 
             mid_price = round((state['orderbook']['bids'][0][0] + state['orderbook']['asks'][0][0]) / 2, 3)
 
