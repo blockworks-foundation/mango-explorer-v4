@@ -2,7 +2,7 @@
 
 Python client library for interacting with Mango Markets V4.
 
-## 📦 Installation
+## Installation
 
 ![PyPI](https://img.shields.io/pypi/v/mango-explorer-v4)
 
