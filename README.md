@@ -61,6 +61,17 @@ async def main():
             quantity=1
         )
     )
+    
+    # Cancel all orders
+    print(
+        await mango_client.cancel_all_orders(
+            mango_account,
+            keypair,
+            'SOL-PERP'
+        )
+    )
+    
+    # There's a simple quoter, using atomic cancel-replace in examples/market_maker.py
 
 asyncio.run(main())
 ```
