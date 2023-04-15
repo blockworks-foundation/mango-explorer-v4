@@ -36,7 +36,7 @@ async def main():
 
     keypair = Keypair.from_secret_key(b58decode(args.keypair))
 
-    print(await mango_client.cancel_all_orders(args.symbol, mango_account, keypair))
+    print(await mango_client.cancel_all_orders(mango_account, keypair, args.symbol))
 
     # 5B9Rq1sZAjtzXFbYh7wiV1thNGiaAC716ejPSBLE3EvTNgKC8CmFETdtMx8L5nfXHYZ3R8WyAqr9upfRbVYyGVg5
     # (Check the UI)

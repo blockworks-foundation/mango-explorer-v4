@@ -601,7 +601,7 @@ class MangoClient():
 
         return remaining_accounts
 
-    def make_serum3_create_open_orders_ix(self, symbol: str, mango_account: MangoAccount):
+    def make_serum3_create_open_orders_ix(self, mango_account: MangoAccount, symbol: str):
         # TODO: Check whether the symbol matches a valid Serum market name
         serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
 
@@ -739,7 +739,7 @@ class MangoClient():
 
         return serum3_place_order_ix
 
-    def make_perp_place_order_ix(self, symbol, side, price, size, mango_account: MangoAccount):
+    def make_perp_place_order_ix(self, mango_account: MangoAccount, symbol, side, price, size):
         perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
         perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
@@ -810,7 +810,7 @@ class MangoClient():
                 except IndexError:
                     logging.error(f"Open orders account for {symbol} not found, creating one...")
 
-                    serum3_create_open_orders_ix = self.make_serum3_create_open_orders_ix('SOL/USDC', mango_account)
+                    serum3_create_open_orders_ix = self.make_serum3_create_open_orders_ix(mango_account, symbol)
 
                     recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
 
@@ -846,7 +846,7 @@ class MangoClient():
 
                 recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
 
-                perp_place_order_ix = self.make_perp_place_order_ix(symbol, side, price, size, mango_account)
+                perp_place_order_ix = self.make_perp_place_order_ix(mango_account, symbol, side, price, size)
 
                 tx.add(perp_place_order_ix)
 
@@ -900,7 +900,7 @@ class MangoClient():
 
         return serum3_cancel_all_orders_ix
 
-    def make_perp_cancel_all_orders_ix(self, symbol: str, mango_account: MangoAccount):
+    def make_perp_cancel_all_orders_ix(self, mango_account: MangoAccount, symbol: str):
         perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
         perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
@@ -922,7 +922,7 @@ class MangoClient():
 
         return perp_cancel_all_orders_ix
 
-    async def cancel_all_orders(self, symbol: str, mango_account: MangoAccount, keypair: Keypair):
+    async def cancel_all_orders(self, mango_account: MangoAccount, keypair: Keypair, symbol: str):
         market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
 
         match market_type:
@@ -945,7 +945,7 @@ class MangoClient():
 
                 tx.recent_blockhash = str(recent_blockhash)
 
-                perp_cancel_all_orders_ix = self.make_perp_cancel_all_orders_ix(symbol, mango_account)
+                perp_cancel_all_orders_ix = self.make_perp_cancel_all_orders_ix(mango_account, symbol)
 
                 tx.add(perp_cancel_all_orders_ix)
 

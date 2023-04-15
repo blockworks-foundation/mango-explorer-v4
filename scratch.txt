@@ -6,10 +6,8 @@ MangoClient:
 MangoAccount:
     - order management
 
-
 TODO:
-- Are unsettled balances being accounted for in equity?
-- Add unsettled funds to balances
-- Add SettleFunds instruction
+- Add unsettled & in order to balances
 - Add total borrows, borrowable and APRs
+- Add settle funds, withdraw & deposit instructions
 - Add sequence enforcer to the example market maker

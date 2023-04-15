@@ -1,10 +1,8 @@
-import asyncio
-import json
-import pathlib
 import argparse
+import asyncio
 
-from solana.keypair import Keypair
 from base58 import b58decode
+from solana.keypair import Keypair
 from solana.transaction import Transaction
 
 from mango_explorer_v4.mango_client import MangoClient

@@ -1,9 +1,7 @@
+**/__pycache__/
+.DS_Store
+.idea
+.swp
 .venv/
 build
-.idea
-id.json
-config.json
-.DS_Store
-**/__pycache__/
 dist/*
-.swp

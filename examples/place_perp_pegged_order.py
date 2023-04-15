@@ -12,6 +12,18 @@ async def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
+        '--mango-account',
+        help='Mango account primary key.',
+        required=True
+    )
+
+    parser.add_argument(
+        '--keypair',
+        help='Solana wallet private key, to sign transactions for the Mango account.',
+        required=True
+    )
+
+    parser.add_argument(
         '--symbol',
         required=True
     )
@@ -39,13 +51,11 @@ async def main():
 
     args = parser.parse_args()
 
-    config = json.load(open(pathlib.Path(__file__).parent.parent / 'config.json'))
-
     mango_client = await MangoClient.connect()
 
-    mango_account = await mango_client.get_mango_account(config['mango_account_pk'])
+    mango_account = await mango_client.get_mango_account(args.mango_account)
 
-    keypair = Keypair.from_secret_key(b58decode(config['secret_key']))
+    keypair = Keypair.from_secret_key(b58decode(args.keypair))
 
     print(
         await mango_client.place_perp_pegged_order(
