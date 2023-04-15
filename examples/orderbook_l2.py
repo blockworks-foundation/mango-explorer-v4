@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import json
 
 from mango_explorer_v4.mango_client import MangoClient
 
@@ -24,7 +23,7 @@ async def main():
 
     mango_client = await MangoClient.connect()
 
-    print(json.dumps(await mango_client.orderbook_l2(args.symbol, args.depth)))
+    print(await mango_client.orderbook_l2(args.symbol, args.depth))
 
 if __name__ == '__main__':
     asyncio.run(main())

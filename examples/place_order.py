@@ -3,6 +3,9 @@ import asyncio
 import json
 import pathlib
 
+import base58
+from solana.keypair import Keypair
+
 from mango_explorer_v4.mango_client import MangoClient
 
 
@@ -34,16 +37,15 @@ async def main():
 
     config = json.load(open(pathlib.Path(__file__).parent.parent / 'config.json'))
 
-    mango_client = await MangoClient.connect(
-        secret_key=config['secret_key'],
-        mango_account_pk=config['mango_account_pk']
-    )
+    mango_client = await MangoClient.connect()
 
-    # print(await mango_client.place_order('SOL/USDC', 'bid', 10, 0.1))
+    keypair = Keypair.from_secret_key(base58.b58decode(config['secret_key']))
 
-    print(await mango_client.place_order(args.symbol, args.side, args.price, args.size))
+    mango_account = await mango_client.get_mango_account(config['mango_account_pk'])
 
-    # 3VQA4zqmRPLtmeHBNV2dKZKhXYX3cHBiM1LpCrjgJZwZDF418GF6RQ9DihSZq6Zg4pjqcUjTMQwEDNLuybfL8mQT
+    print(await mango_client.place_order(args.symbol, args.side, args.price, args.size, mango_account, keypair))
+
+    # e.g 3VQA4zqmRPLtmeHBNV2dKZKhXYX3cHBiM1LpCrjgJZwZDF418GF6RQ9DihSZq6Zg4pjqcUjTMQwEDNLuybfL8mQT
     # (Check the UI)
 
 

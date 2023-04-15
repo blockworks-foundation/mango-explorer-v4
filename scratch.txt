@@ -8,7 +8,7 @@ MangoAccount:
 
 
 TODO:
-- Decouple general data fetching functions from those explicitly requiring a Mango account
 - Add unsettled funds to balances
 - Add SettleFunds instruction
+- Add total borrows, borrowable and APRs
 - Add sequence enforcer to the example market maker

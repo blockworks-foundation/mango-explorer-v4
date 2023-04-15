@@ -106,6 +106,7 @@ class MangoAccount:
     perps: list[types.perp_position.PerpPosition]
     padding7: int
     perp_open_orders: list[types.perp_open_order.PerpOpenOrder]
+    public_key: PublicKey = None
 
     @classmethod
     async def fetch(
@@ -122,7 +123,9 @@ class MangoAccount:
         if info.owner != program_id.to_solders():
             raise ValueError("Account does not belong to this program")
         bytes_data = info.data
-        return cls.decode(bytes_data)
+        mango_account = cls.decode(bytes_data)
+        mango_account.public_key = address
+        return mango_account
 
     @classmethod
     async def fetch_multiple(
@@ -140,7 +143,9 @@ class MangoAccount:
                 continue
             if info.account.owner != program_id:
                 raise ValueError("Account does not belong to this program")
-            res.append(cls.decode(info.account.data))
+            mango_account = cls.decode(info.account.data)
+            mango_account.public_key = info.pubkey
+            res.append(mango_account)
         return res
 
     @classmethod
