@@ -123,8 +123,7 @@ class MangoAccount:
         if info.owner != program_id.to_solders():
             raise ValueError("Account does not belong to this program")
         bytes_data = info.data
-        mango_account = cls.decode(bytes_data)
-        mango_account.public_key = address
+        mango_account = cls.decode(bytes_data, address)
         return mango_account
 
     @classmethod
@@ -143,13 +142,12 @@ class MangoAccount:
                 continue
             if info.account.owner != program_id:
                 raise ValueError("Account does not belong to this program")
-            mango_account = cls.decode(info.account.data)
-            mango_account.public_key = info.pubkey
+            mango_account = cls.decode(info.account.data, info.pubkey)
             res.append(mango_account)
         return res
 
     @classmethod
-    def decode(cls, data: bytes) -> "MangoAccount":
+    def decode(cls, data: bytes, public_key: PublicKey = None) -> "MangoAccount":
         if data[:ACCOUNT_DISCRIMINATOR_SIZE] != cls.discriminator:
             raise AccountInvalidDiscriminator(
                 "The discriminator for this account is invalid"
@@ -203,6 +201,7 @@ class MangoAccount:
                     dec.perp_open_orders,
                 )
             ),
+            public_key=public_key
         )
 
     def to_json(self) -> MangoAccountJSON:

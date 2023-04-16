@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Literal
 
 import aiostream.stream
+import anchorpy.error
 import base58
 from anchorpy import Provider, Wallet
 from pyserum.async_open_orders_account import AsyncOpenOrdersAccount
@@ -20,6 +21,7 @@ from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Processed
 from solana.rpc.websocket_api import connect
 from solana.transaction import AccountMeta, Transaction
+from solana.rpc.types import MemcmpOpts
 from solders.rpc.responses import AccountNotification
 from solders.account import Account
 
@@ -529,6 +531,24 @@ class MangoClient():
         return funding * 100
 
     async def get_mango_account(self, public_key: str): return await MangoAccount.fetch(self.connection, PublicKey(public_key))
+
+    async def get_all_mango_accounts(self):
+        response = await self.connection.get_program_accounts(
+            MANGO_PROGRAM_ID,
+            encoding='base64'
+        )
+
+        mango_accounts = []
+
+        for entry in response.value: # TODO: Use proper filters instead
+            try:
+                mango_account = MangoAccount.decode(entry.account.data, entry.pubkey)
+            except anchorpy.error.AccountInvalidDiscriminator:
+                continue
+
+            mango_accounts.append(mango_account)
+
+        return mango_accounts
 
     def _health_remaining_accounts(
         self,

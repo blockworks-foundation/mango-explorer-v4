@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 
-import solana.exceptions
 from base58 import b58decode
 from solana.keypair import Keypair
 from solana.transaction import Transaction
