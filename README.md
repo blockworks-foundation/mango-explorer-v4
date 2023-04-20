@@ -78,7 +78,9 @@ asyncio.run(main())
 
 ## Running the examples
 
-You can find a collection of example code [here](./mango_explorer_v4/examples). These are to be run as command-line tools, with the simplest of these being the [symbols retrieval function](./mango_explorer_v4/examples/symbols.py), executable as:
+**Please make sure you're running mango-explorer-v4@0.7.3 or above - these instructions don't apply to older versions.**
+
+You can find a collection of example code [here](./mango_explorer_v4/examples). These are to be run as command-line tools, with the simplest being the [symbols retrieval function](./mango_explorer_v4/examples/symbols.py), executable as:
 ```shell
 python -m mango_explorer_v4.examples.symbols
 # Output:
@@ -99,13 +101,13 @@ Examples may take arguments, which are specified in their source files. The [equ
 
 ```shell
 python -m mango_explorer_v4.examples.equity --mango-account 9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
-# Output matches the Account Balance at https://app.mango.markets/?address=9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
+# Output the Account Balance at https://app.mango.markets/?address=9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
 
 python -m mango_explorer_v4.examples.orderbook_l2 --symbol SOL-PERP --depth 5
-# Outputs matches the first 5 orders in the book at https://app.mango.markets/trade?name=SOL-PERP
+# Outputs the first 5 orders in the book at https://app.mango.markets/trade?name=SOL-PERP
 ```
 
-Some transactions, like order placement, require a keypair. On Phantom wallet it can be fetched as follows:
+Some transactions, like order placement, require a keypair. On [Phantom wallet](https://phantom.app/) it can be fetched as follows:
 
 https://user-images.githubusercontent.com/28162761/233431861-5db448c1-fdf9-4dd0-8df9-156b131dfd71.mov
 
@@ -121,6 +123,14 @@ python -m mango_explorer_v4.examples.place_order \
     --side bids \
     --price 1 \
     --size 0.1
+```
+
+And cancel them later as:
+```shell
+python -m mango_explorer_v4.examples.cancel_all_orders \
+    --keypair [KEYPAIR] \
+    --mango-account [MANGO_ACCOUNT] \
+    --symbol SOL-PERP
 ```
 
 ## Support
