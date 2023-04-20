@@ -91,7 +91,7 @@ python -m mango_explorer_v4.examples.symbols
 #         'maker_fees': ...,
 #         'taker_fees': ...
 #     }
-#     ...
+#     ... all order symbols
 # ]
 ```
 
@@ -102,12 +102,26 @@ python -m mango_explorer_v4.examples.equity --mango-account 9XJt2tvSZghsMAhWto1V
 # Output matches the Account Balance at https://app.mango.markets/?address=9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
 
 python -m mango_explorer_v4.examples.orderbook_l2 --symbol SOL-PERP --depth 5
-# Outputs matches the first 5 orders Book at https://app.mango.markets/trade?name=SOL-PERP
+# Outputs matches the first 5 orders in the book at https://app.mango.markets/trade?name=SOL-PERP
 ```
 
 Some transactions, like order placement, require a keypair. On Phantom wallet it can be fetched as follows:
 
 https://user-images.githubusercontent.com/28162761/233431861-5db448c1-fdf9-4dd0-8df9-156b131dfd71.mov
+
+With the keypair at hand you can place orders using:
+
+```shell
+python -m mango_explorer_v4.examples.place_order \
+    --keypair [KEYPAIR] \
+    # ^ Replace with your keypair
+    --mango-account [MANGO_ACCOUNT] \
+    # ^ Replace with a Mango account owned by the keypair
+    --symbol SOL-PERP \
+    --side bids \
+    --price 1 \
+    --size 0.1
+```
 
 ## Support
 
