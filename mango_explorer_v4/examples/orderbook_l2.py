@@ -9,8 +9,7 @@ async def main():
 
     parser.add_argument(
         '--symbol',
-        required=False,
-        default='SOL-PERP'
+        required=True
     )
 
     parser.add_argument(

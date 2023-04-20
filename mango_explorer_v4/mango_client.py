@@ -252,8 +252,8 @@ class MangoClient():
 
                 orderbook = {
                     'symbol': symbol,
-                    'bids': BookSideItems('bids', bids, perp_market, oracle_price).l2(),
-                    'asks': BookSideItems('asks', asks, perp_market, oracle_price).l2(),
+                    'bids': BookSideItems('bids', bids, perp_market, oracle_price).l2()[:depth],
+                    'asks': BookSideItems('asks', asks, perp_market, oracle_price).l2()[:depth],
                     'slot': accounts.context.slot
                 }
 

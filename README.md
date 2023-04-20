@@ -12,9 +12,9 @@ Python client library for interacting with Mango Markets V4.
 pip install mango-explorer-v4
 ```
 
-## Example usage
+## Usage
 
-Assuming that you have a SOL wallet already set up, visit https://app.mango.markets to create a Mango account and fund it so that you can place orders. You can find collection of example code [here](./mango_explorer_v4/examples).
+Assuming that you have a SOL wallet already set up, visit https://app.mango.markets to create a Mango account and fund it so that you can place orders.
 
 ```python
 import asyncio
@@ -74,6 +74,35 @@ async def main():
     # There's a simple quoter, using atomic cancel-replace in examples/market_maker.py
 
 asyncio.run(main())
+```
+
+## Running the examples
+
+You can find a collection of example code [here](./mango_explorer_v4/examples). These are to be run as command-line tools, with the simplest of these being the [symbols retrieval function](./mango_explorer_v4/examples/symbols.py), executable as:
+```shell
+python -m mango_explorer_v4.examples.symbols
+# Output:
+# [
+#     {
+#         'name': 'SOL/USDC',
+#         'type': 'spot',
+#         'base_currency': 'SOL',
+#         'quote_currency': 'USDC',
+#         'maker_fees': ...,
+#         'taker_fees': ...
+#     }
+#     ...
+# ]
+```
+
+Examples may take arguments, which are specified in their source files. The [equity function](https://github.com/blockworks-foundation/mango-explorer-v4/blob/master/mango_explorer_v4/examples/equity.py) for example, takes a Mango account primary key, whilst the [order book retrieval](https://github.com/blockworks-foundation/mango-explorer-v4/blob/master/mango_explorer_v4/examples/orderbook_l2.py) takes a symbol & (optional) depth. These can be specified in the shell like this:
+
+```shell
+python -m mango_explorer_v4.examples.equity --mango-account 9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
+# Output matches the Account Balance at https://app.mango.markets/?address=9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
+
+python -m mango_explorer_v4.examples.orderbook_l2 --symbol SOL-PERP --depth 5
+# Outputs matches the first 5 orders Book at https://app.mango.markets/trade?name=SOL-PERP
 ```
 
 ## Support
