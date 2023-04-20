@@ -173,7 +173,7 @@ class MangoClient():
                     'name': perp_market_config['name'],
                     'type': 'perpetual',
                     'base_currency': perp_market_config['name'].split('-')[0],
-                    'quote_currency': perp_market_config['name'].split('-')[1],
+                    'quote_currency': 'USDC',
                     'maker_fees': - (1 / 1e4),
                     'taker_fees': (4 / 1e4)
                 }
