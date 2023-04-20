@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 
-from mango_explorer_v4.mango_client import MangoClient
+from ..mango_client import MangoClient
 
 
 async def main():
@@ -13,12 +13,17 @@ async def main():
         default='SOL-PERP'
     )
 
+    parser.add_argument(
+        '--depth',
+        default=50,
+        type=int
+    )
+
     args = parser.parse_args()
 
     mango_client = await MangoClient.connect()
 
-    print(await mango_client.funding_rate(args.symbol))
-
+    print(await mango_client.orderbook_l2(args.symbol, args.depth))
 
 if __name__ == '__main__':
     asyncio.run(main())

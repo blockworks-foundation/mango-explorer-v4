@@ -1,11 +1,10 @@
 import argparse
 import asyncio
-import json
-import pathlib
+
 from base58 import b58decode
 from solana.keypair import Keypair
 
-from mango_explorer_v4.mango_client import MangoClient
+from ..mango_client import MangoClient
 
 
 async def main():
@@ -35,17 +34,12 @@ async def main():
     )
 
     parser.add_argument(
-        '--price-offset',
+        '--price',
         type=float
     )
 
     parser.add_argument(
-        '--peg-limit',
-        type=float
-    )
-
-    parser.add_argument(
-        '--quantity',
+        '--size',
         type=float
     )
 
@@ -53,21 +47,15 @@ async def main():
 
     mango_client = await MangoClient.connect()
 
-    mango_account = await mango_client.get_mango_account(args.mango_account)
-
     keypair = Keypair.from_secret_key(b58decode(args.keypair))
 
-    print(
-        await mango_client.place_perp_pegged_order(
-            mango_account,
-            keypair,
-            args.symbol,
-            args.side,
-            args.price_offset,
-            args.peg_limit,
-            args.quantity
-        )
-    )
+    mango_account = await mango_client.get_mango_account(args.mango_account)
+
+    print(await mango_client.place_order(args.symbol, args.side, args.price, args.size, mango_account, keypair))
+
+    # e.g 3VQA4zqmRPLtmeHBNV2dKZKhXYX3cHBiM1LpCrjgJZwZDF418GF6RQ9DihSZq6Zg4pjqcUjTMQwEDNLuybfL8mQT
+    # (Check the UI)
+
 
 if __name__ == '__main__':
     asyncio.run(main())

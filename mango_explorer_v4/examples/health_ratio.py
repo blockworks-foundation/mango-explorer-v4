@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 
-from mango_explorer_v4.mango_client import MangoClient
+from ..mango_client import MangoClient
 
 
 async def main():
@@ -19,13 +19,7 @@ async def main():
 
     mango_account = await mango_client.get_mango_account(args.mango_account)
 
-    print(await mango_client.balances(mango_account))
-
-    # [
-    #   {'symbol': 'USDC', 'balance': 2.7435726906761744},
-    #   {'symbol': 'SOL', 'balance': 0.1690007074236178},
-    #   {'symbol': 'MSOL', 'balance': 0.0}
-    # ]
+    print(await mango_client.health_ratio(mango_account))
 
 
 if __name__ == '__main__':

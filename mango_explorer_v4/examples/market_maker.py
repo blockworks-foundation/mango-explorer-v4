@@ -7,7 +7,7 @@ from solana.transaction import Transaction
 from solana.keypair import Keypair
 from base58 import b58decode
 
-from mango_explorer_v4.mango_client import MangoClient
+from ..mango_client import MangoClient
 
 
 async def main():
