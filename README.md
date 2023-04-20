@@ -116,9 +116,7 @@ With the keypair at hand you can place orders using:
 ```shell
 python -m mango_explorer_v4.examples.place_order \
     --keypair [KEYPAIR] \
-    # ^ Replace with your keypair
     --mango-account [MANGO_ACCOUNT] \
-    # ^ Replace with a Mango account owned by the keypair
     --symbol SOL-PERP \
     --side bids \
     --price 1 \
