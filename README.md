@@ -105,6 +105,10 @@ python -m mango_explorer_v4.examples.orderbook_l2 --symbol SOL-PERP --depth 5
 # Outputs matches the first 5 orders Book at https://app.mango.markets/trade?name=SOL-PERP
 ```
 
+Some transactions, like order placement, require a keypair. On Phantom wallet it can be fetched as follows:
+
+https://user-images.githubusercontent.com/28162761/233431861-5db448c1-fdf9-4dd0-8df9-156b131dfd71.mov
+
 ## Support
 
 Support is available on the [Mango Markets Discord server](https://discord.gg/8vs8uJJrcp) - post in the `#dev-discussion` channel for any questions or feature requests. 
