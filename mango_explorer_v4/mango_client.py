@@ -1527,3 +1527,6 @@ class MangoClient():
             )
 
         return dict(entries)
+
+    async def orders(self, mango_account: MangoAccount):
+        pass
