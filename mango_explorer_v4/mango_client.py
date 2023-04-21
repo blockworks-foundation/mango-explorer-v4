@@ -1496,6 +1496,8 @@ class MangoClient():
             ]
         ]
 
+        entries = []
+
         for perp_position, perp_market, perp_market_config, oracle_price in zip(
             perp_positions,
             perp_markets,
@@ -1510,16 +1512,18 @@ class MangoClient():
 
             pnl = PerpPositionHelper.cumulative_pnl_over_position_lifetime(perp_position, perp_market, oracle_price)
 
-            print(
-                perp_market_config['name'],
-                {
-                    'size': size,
-                    'notional': float(Decimal(size) *  oracle_price),
-                    'entry_price': float(entry_price),
-                    'oracle_price': float(oracle_price),
-                    'unsettled_pnl': float(unsettled_pnl),
-                    'pnl': float(pnl)
-                }
+            entries.append(
+                (
+                    perp_market_config['name'],
+                    {
+                        'size': size,
+                        'notional': float(Decimal(size) *  oracle_price),
+                        'entry_price': float(entry_price),
+                        'oracle_price': float(oracle_price),
+                        'unsettled_pnl': float(unsettled_pnl),
+                        'pnl': float(pnl)
+                    }
+                )
             )
 
-        return None
+        return dict(entries)
