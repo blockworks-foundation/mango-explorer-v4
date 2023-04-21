@@ -563,20 +563,21 @@ class MangoClient():
             case 'fixed':
                 token_indices = [token.token_index for token in mango_account.tokens]
 
-                if len(banks) > 0:
-                    for bank in banks:
-                        if bank.token_index not in token_indices:
-                            index = [
-                                idx for idx, token in enumerate(mango_account.tokens)
-                                if token.token_index == 65535
-                                if token_indices[idx] == 65535
-                            ][0]
+                for bank in banks:
+                    if bank.token_index not in token_indices:
+                        index = [
+                            idx for idx, token in enumerate(mango_account.tokens)
+                            if token.token_index == 65535
+                            if token_indices[idx] == 65535
+                        ][0]
 
-                            token_indices[index] = bank.token_index
+                        token_indices[index] = bank.token_index
 
                 mint_infos = [
-                    mint_info for mint_info in self.mint_infos
-                    if mint_info.token_index in [token_index for token_index in token_indices if token_index != 65535]
+                    [mint_info for mint_info in self.mint_infos if mint_info.token_index == token_index][0]
+                    for token_index
+                    in token_indices
+                    if token_index != 65535
                 ]
 
                 health_remaining_account_pks.extend([mint_info.banks[0] for mint_info in mint_infos])
@@ -585,16 +586,15 @@ class MangoClient():
 
                 perp_market_indices = [perp.market_index for perp in mango_account.perps]
 
-                if len(perp_markets) > 0:
-                    for perp_market in perp_markets:
-                        if perp_market.perp_market_index not in perp_market_indices:
-                            index = [
-                                idx for idx, perp in enumerate(mango_account.perps)
-                                if perp.market_index == 65535
-                                if perp_market_indices[idx] == 65535
-                            ][0] = perp_market.perp_market_index
+                for perp_market in perp_markets:
+                    if perp_market.perp_market_index not in perp_market_indices:
+                        index = [
+                            idx for idx, perp in enumerate(mango_account.perps)
+                            if perp.market_index == 65535
+                            if perp_market_indices[idx] == 65535
+                        ][0] = perp_market.perp_market_index
 
-                            perp_market_indices[index] = perp_market.perp_market_index
+                        perp_market_indices[index] = perp_market.perp_market_index
 
                 perp_markets = [
                     perp_market for perp_market in self.perp_markets

@@ -101,7 +101,7 @@ Examples may take arguments, which are specified in their source files. The [equ
 
 ```shell
 python -m mango_explorer_v4.examples.equity --mango-account 9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
-# Output the Account Balance at https://app.mango.markets/?address=9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
+# Outputs the Account Balance at https://app.mango.markets/?address=9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
 
 python -m mango_explorer_v4.examples.orderbook_l2 --symbol SOL-PERP --depth 5
 # Outputs the first 5 orders in the book at https://app.mango.markets/trade?name=SOL-PERP
