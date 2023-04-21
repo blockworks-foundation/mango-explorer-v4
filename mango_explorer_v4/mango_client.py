@@ -11,8 +11,7 @@ from typing import Literal
 
 import aiostream.stream
 import anchorpy.error
-import base58
-from anchorpy import Provider, Wallet
+from collections import defaultdict
 from pyserum.async_open_orders_account import AsyncOpenOrdersAccount
 from pyserum.market import AsyncMarket, OrderBook
 from solana.keypair import Keypair
@@ -21,7 +20,6 @@ from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Processed
 from solana.rpc.websocket_api import connect
 from solana.transaction import AccountMeta, Transaction
-from solana.rpc.types import MemcmpOpts
 from solders.rpc.responses import AccountNotification
 from solders.account import Account
 
@@ -62,7 +60,7 @@ from mango_explorer_v4.types.health_type import Init, Maint, LiquidationEnd
 from mango_explorer_v4.types.serum3_info import Serum3Info
 from mango_explorer_v4.types.health_cache import HealthCache
 from mango_explorer_v4.types.health_type import HealthTypeKind
-from .constants import RUST_I64_MAX, QUOTE_DECIMALS, SERUM_PROGRAM_ID
+from .constants import RUST_I64_MAX, SERUM_PROGRAM_ID
 from .constructs.book_side_items import BookSideItems
 from .constructs.serum3_reserved import Serum3Reserved
 from .oracles import pyth
@@ -972,41 +970,98 @@ class MangoClient():
                 return response
 
     async def balances(self, mango_account: MangoAccount):
-        # TODO: Clean up this mess
-        return [
-            {
-                'symbol': meta['symbol'],
-                'balance': float(
-                    meta['token_indexed_position'] * (
-                        meta['bank_deposit_index'] if meta['token_indexed_position'] > 0
-                        else meta['bank_borrow_index']
-                    )
-                    /
-                    meta['bank_mint_decimals']
+        committed = defaultdict(lambda: 0.0)
+
+        token_positions = MangoAccountHelper.active_token_positions(mango_account)
+
+        for token_position in token_positions:
+            bank = [bank for bank in self.banks if bank.token_index == token_position.token_index][0]
+
+            token_config = [
+                token_config for token_config in self.group_config['tokens']
+                if token_config['tokenIndex'] == token_position.token_index
+            ][0]
+
+            token_indexed_position = token_position.indexed_position.to_decimal()
+
+            bank_deposit_index = bank.deposit_index.to_decimal()
+
+            bank_borrow_index = bank.borrow_index.to_decimal()
+
+            balance = float(
+                token_indexed_position * (
+                    bank_deposit_index
+                    if token_indexed_position > 0
+                    else bank_borrow_index
                 )
+                /
+                10 ** bank.mint_decimals
+            )
+
+            committed[token_config['symbol']] = balance
+
+        in_orders = defaultdict(lambda: 0.0)
+
+        unsettled = defaultdict(lambda: 0.0)
+
+        open_orders = MangoAccountHelper.active_serum3_orders(mango_account)
+
+        for open_order, open_orders_external in zip(
+            open_orders,
+            await asyncio.gather(*[
+                AsyncOpenOrdersAccount.load(self.connection, str(open_orders.open_orders))
+                for open_orders
+                in open_orders
+            ]) # TODO: ^ Use one RPC call
+        ):
+            base_bank = [bank for bank in self.banks if bank.token_index == open_order.base_token_index][0]
+
+            quote_bank = [bank for bank in self.banks if bank.token_index == open_order.quote_token_index][0]
+
+            base_name = bytes(base_bank.name).decode().strip('\x00')
+
+            quote_name = bytes(quote_bank.name).decode().strip('\x00')
+
+            base_token_unsettled = float(
+                Decimal(open_orders_external.base_token_free) / Decimal(10 ** base_bank.mint_decimals)
+            )
+
+            quote_token_unsettled = float(
+                Decimal(open_orders_external.quote_token_free) / Decimal(10 ** quote_bank.mint_decimals)
+            )
+
+            base_token_locked = float(
+                Decimal(open_orders_external.base_token_total - open_orders_external.base_token_free)
+                /
+                Decimal(10 ** base_bank.mint_decimals)
+            )
+
+            quote_token_locked = float(
+                Decimal(open_orders_external.quote_token_total - open_orders_external.quote_token_free)
+                /
+                Decimal(10 ** quote_bank.mint_decimals)
+            )
+
+            in_orders[base_name] += base_token_locked
+
+            in_orders[quote_name] += quote_token_locked
+
+            unsettled[base_name] += base_token_unsettled
+
+            unsettled[quote_name] += quote_token_unsettled
+
+        entries = []
+
+        for symbol in {*committed.keys(), *in_orders.keys(), *unsettled.keys()}:
+            content = {
+                'balance': committed.get(symbol, 0),
+                'in_orders': in_orders.get(symbol, 0),
+                'unsettled': unsettled.get(symbol, 0)
             }
-            for meta in
-            [
-                {
-                    'symbol': token_config['symbol'],
-                    'token_indexed_position': Decimal(token.indexed_position.val) / divider,
-                    'bank_mint_decimals': 10 ** bank.mint_decimals,
-                    'bank_deposit_index': Decimal(bank.deposit_index.val) / divider,
-                    'bank_borrow_index': Decimal(bank.borrow_index.val) / divider,
-                }
-                for token, bank, token_config, divider in
-                [
-                    [
-                        token,
-                        [bank for bank in self.banks if bank.token_index == token.token_index][0],
-                        [token_config for token_config in self.group_config['tokens'] if token_config['tokenIndex'] == token.token_index][0],
-                        Decimal(2 ** (8 * 6))
-                    ]
-                    for token in mango_account.tokens
-                    if token.token_index != 65535
-                ]
-            ]
-        ]
+
+            entries.append((symbol, content))
+
+        return dict(entries)
 
     def make_place_perp_pegged_order_ix(
         self,
