@@ -575,9 +575,7 @@ class MangoClient():
 
                 mint_infos = [
                     [mint_info for mint_info in self.mint_infos if mint_info.token_index == token_index][0]
-                    for token_index
-                    in token_indices
-                    if token_index != 65535
+                    for token_index in token_indices if token_index != 65535
                 ]
 
                 health_remaining_account_pks.extend([mint_info.banks[0] for mint_info in mint_infos])
