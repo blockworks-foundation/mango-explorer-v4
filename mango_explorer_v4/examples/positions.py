@@ -19,14 +19,7 @@ async def main():
 
     mango_account = await mango_client.get_mango_account(args.mango_account)
 
-    print(await mango_client.balances(mango_account))
-
-    # Example output:
-    # {
-    # 'MSOL': {'balance': 0.0, 'in_orders': 0.0, 'unsettled': 0.0},
-    # 'SOL': {'balance': 0.08695266961087615, 'in_orders': 0.0, 'unsettled': 0.0},
-    # 'USDC': {'balance': 3.406757116516584, 'in_orders': 0.4, 'unsettled': 1e-05}
-    # }
+    print(await mango_client.positions(mango_account))
 
 
 if __name__ == '__main__':

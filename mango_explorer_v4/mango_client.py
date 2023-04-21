@@ -1467,3 +1467,59 @@ class MangoClient():
             return 100 * (assets - liabs) / liabs
         else:
             return sys.maxsize
+
+    async def positions(self, mango_account: MangoAccount):
+        perp_positions = MangoAccountHelper.active_perp_positions(mango_account)
+
+        perp_markets = [
+            [
+                perp_market for perp_market in self.perp_markets
+                if perp_market.perp_market_index == perp_position.market_index
+            ][0]
+            for perp_position in perp_positions
+        ]
+
+        perp_market_configs = [
+            [
+                perp_market_config for perp_market_config in self.perp_market_configs
+                if perp_market_config['marketIndex'] == perp_position.market_index
+            ][0]
+            for perp_position in perp_positions
+        ]
+
+        oracle_prices = [
+            oracle.agg.price * (Decimal(10) ** oracle.expo)
+            for oracle in [
+                pyth.PRICE.parse(account.data)
+                for account in
+                (await self.connection.get_multiple_accounts([perp_market.oracle for perp_market in perp_markets])).value
+            ]
+        ]
+
+        for perp_position, perp_market, perp_market_config, oracle_price in zip(
+            perp_positions,
+            perp_markets,
+            perp_market_configs,
+            oracle_prices
+        ):
+            size = PerpPositionHelper.base_position_ui(perp_position, perp_market)
+
+            unsettled_pnl = PerpPositionHelper.unsettled_pnl(perp_position, perp_market, oracle_price)
+
+            entry_price = PerpPositionHelper.average_entry_price(perp_position, perp_market)
+
+            pnl = PerpPositionHelper.cumulative_pnl_over_position_lifetime(perp_position, perp_market, oracle_price)
+
+            print(
+                perp_market_config['name'],
+                {
+                    'size': size,
+                    'notional': float(Decimal(size) *  oracle_price),
+                    'entry_price': float(entry_price),
+                    'oracle_price': float(oracle_price),
+                    'unsettled_pnl': float(unsettled_pnl),
+                    'pnl': float(pnl)
+                }
+            )
+
+        return None

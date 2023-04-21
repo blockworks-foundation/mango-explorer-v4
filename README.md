@@ -34,14 +34,15 @@ async def main():
     
     # It is possible to livestream both orderbook & fills, look for incremental_*.py in the examples folder
 
-    # Fill in your Mango account public key e.g 9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
+    # Fill in your Mango account public key e.g 9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2 
     mango_account = await mango_client.get_mango_account('PUBLIC_KEY')
- 
-    print(await mango_client.balances(mango_account))
-    print(await mango_client.equity(mango_account))
 
     # You can look up any Mango account using
     # https://app.mango.markets/?address=9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2
+ 
+    print(await mango_client.balances(mango_account))
+    
+    print(await mango_client.equity(mango_account)) # Account Value
     
     # Fill in output from Phantom's "Export Private Key" e.g 2pvKRVh ... 1fL5qGq
     keypair = Keypair.from_secret_key(b58decode('SECRET_KEY'))

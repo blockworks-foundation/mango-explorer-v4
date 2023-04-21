@@ -96,5 +96,23 @@ class PerpPositionHelper():
     def has_open_fills(perp_position: PerpPosition):
         return perp_position.taker_base_lots != 0 or perp_position.taker_quote_lots != 0
 
+    @staticmethod
+    def average_entry_price(perp_position: PerpPosition, perp_market: PerpMarket) -> Decimal:
+        if perp_position.market_index != perp_market.perp_market_index:
+            raise ValueError("Perp position doesn't belong to perp market")
+
+        return (Decimal(perp_position.avg_entry_price_per_base_lot) / Decimal(perp_market.base_lot_size)) / Decimal(10 ** (6 - perp_market.base_decimals))
+
+    @staticmethod
+    def cumulative_pnl_over_position_lifetime(perp_position: PerpPosition, perp_market: PerpMarket, oracle_price: Decimal) -> Decimal:
+        if perp_position.market_index != perp_market.perp_market_index:
+            raise ValueError("Perp position doesn't belong to perp market")
+
+        price_change = (oracle_price - PerpPositionHelper.average_entry_price(perp_position, perp_market)) * Decimal(10 ** (6 - perp_market.base_decimals))
+
+        return (
+            perp_position.realized_pnl_for_position_native.to_decimal() + Decimal(PerpPositionHelper.base_position_native(perp_position, perp_market)) * price_change
+        ) / Decimal(1e6)
+
 
 
