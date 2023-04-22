@@ -629,7 +629,7 @@ class MangoClient():
             if serum_market.market_index == serum_market_index
         ][0]
 
-        [open_orders_pk, nonce] = PublicKey.find_program_address(
+        [open_orders, _] = PublicKey.find_program_address(
             [
                 bytes('Serum3OO', 'utf-8'),
                 bytes(mango_account.public_key),
@@ -645,7 +645,7 @@ class MangoClient():
             'serum_market': PublicKey(serum_market_config['publicKey']),
             'serum_program': serum_market.serum_program,
             'serum_market_external': serum_market.serum_market_external,
-            'open_orders': open_orders_pk,
+            'open_orders': open_orders,
             'payer': mango_account.owner
         }
 
@@ -697,10 +697,14 @@ class MangoClient():
             'limit': 10
         }
 
-        serum3 = [serum3 for serum3 in mango_account.serum3 if serum3.market_index == serum_market_index][0]
-
-        if serum3 is None:
-            raise Exception('serum3 account not found')
+        [open_orders, _] = PublicKey.find_program_address(
+            [
+                bytes('Serum3OO', 'utf-8'),
+                bytes(mango_account.public_key),
+                bytes(PublicKey(serum_market_config['publicKey']))
+            ],
+            MANGO_PROGRAM_ID
+        )
 
         payer_token_index = {
             'bids': serum_market.quote_token_index,
@@ -709,7 +713,7 @@ class MangoClient():
 
         bank = [bank for bank in self.banks if bank.token_index == payer_token_index][0]
 
-        banks_config = [
+        bank_configs = [
             {
                 'tokenIndex': token_config['tokenIndex'],
                 'publicKey': PublicKey(token_config['banks'][0]['publicKey'])
@@ -718,7 +722,7 @@ class MangoClient():
             if token_config['active']
         ]
 
-        bank_config = [bank_config for bank_config in banks_config if bank_config['tokenIndex'] == bank.token_index][0]
+        bank_config = [bank_config for bank_config in bank_configs if bank_config['tokenIndex'] == bank.token_index][0]
 
         serum_market_external_vault_signer_address = PublicKey.create_program_address([
             bytes(serum_market.serum_market_external),
@@ -729,7 +733,7 @@ class MangoClient():
             'group': mango_account.group,
             'account': mango_account.public_key,
             'owner': mango_account.owner,
-            'open_orders': serum3.open_orders,
+            'open_orders': open_orders,
             'serum_market': PublicKey(serum_market_config['publicKey']),
             'serum_program': SERUM_PROGRAM_ID,
             'serum_market_external': serum_market.serum_market_external,
@@ -760,21 +764,10 @@ class MangoClient():
 
         perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
 
-        quote_decimals = 6
-
-        def to_native(ui_amount: float, decimals: float) -> int:
-            return int(ui_amount * 10 ** decimals)
-
-        def ui_price_to_lots(perp_market: PerpMarket, price: float) -> int:
-            return int(to_native(price, quote_decimals) * perp_market.base_lot_size / (perp_market.quote_lot_size * 10 ** perp_market.base_decimals))
-
-        def ui_base_to_lots(perp_market: PerpMarket, size: float) -> int:
-            return int(to_native(size, perp_market.base_decimals) // perp_market.base_lot_size)
-
         perp_place_order_args: PerpPlaceOrderArgs = {
             'side': {'bids': Bid, 'asks': Ask}[side],
-            'price_lots': ui_price_to_lots(perp_market, price),
-            'max_base_lots': ui_base_to_lots(perp_market, size),
+            'price_lots': PerpMarketHelper.ui_price_to_lots(perp_market, price),
+            'max_base_lots': PerpMarketHelper.ui_base_to_lots(perp_market, size),
             'max_quote_lots': sys.maxsize,
             'client_order_id': int(time.time() * 1e3),
             'order_type': place_order_type.Limit(),
@@ -821,24 +814,12 @@ class MangoClient():
 
                 serum_market_index = serum_market_config['marketIndex']
 
+                tx = Transaction()
+
                 try:
                     serum3 = [serum3 for serum3 in mango_account.serum3 if serum3.market_index == serum_market_index][0]
                 except IndexError:
-                    logging.error(f"Open orders account for {symbol} not found, creating one...")
-
-                    serum3_create_open_orders_ix = self.make_serum3_create_open_orders_ix(mango_account, symbol)
-
-                    recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
-
-                    tx = Transaction()
-
-                    tx.add(serum3_create_open_orders_ix)
-
-                    response = await self.connection.send_transaction(tx, keypair, recent_blockhash=recent_blockhash)
-
-                    await self.connection.confirm_transaction(response.value)
-
-                    logging.error(f"Open orders account created for {symbol}: {response}. Please re-launch the program.")
+                    tx.add(self.make_serum3_create_open_orders_ix(mango_account, symbol))
 
                 serum3_place_order_ix = self.make_serum3_place_order_ix(
                     mango_account,
@@ -847,8 +828,6 @@ class MangoClient():
                     price,
                     size
                 )
-
-                tx = Transaction()
 
                 recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
 

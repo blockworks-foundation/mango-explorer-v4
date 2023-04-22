@@ -6,3 +6,4 @@
 build
 dist/*
 scratch.txt
+mango_explorer_v4/examples/scratch.py
