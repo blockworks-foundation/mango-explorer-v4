@@ -553,7 +553,8 @@ class MangoClient():
         retriever: Literal['fixed', 'scanning'],
         banks: [Bank],
         perp_markets: [PerpMarket],
-        mango_account: MangoAccount
+        mango_account: MangoAccount,
+        open_orders_for_market: [Serum3Market, PublicKey]
     ) -> [AccountMeta]:
         health_remaining_account_pks = []
 
@@ -602,11 +603,36 @@ class MangoClient():
                     if perp_market_config['marketIndex'] in [perp_market.perp_market_index for perp_market in perp_markets]
                 ]
 
+                serum_position_indices = [{'market_index': serum3.market_index, 'open_orders': serum3.open_orders} for serum3 in mango_account.serum3]
+
+                for serum3_market, open_orders in open_orders_for_market:
+                    if serum3_market.market_index in [
+                        serum_position_index['market_index'] for serum_position_index in serum_position_indices
+                    ]:
+                        continue
+
+                    idx = next(iter([
+                        idx
+                        for idx, serum_position_index
+                        in enumerate(serum_position_indices)
+                        if serum_position_index['market_index'] == 65535
+                    ]), None)
+
+                    if idx is None:
+                        raise ValueError('No free slots for extra open orders for market')
+
+                    serum_position_indices[idx]['market_index'] = serum3_market.market_index
+                    serum_position_indices[idx]['open_orders'] = open_orders
+
                 health_remaining_account_pks.extend(perp_market_pks)
 
                 health_remaining_account_pks.extend([perp_market.oracle for perp_market in perp_markets])
 
-                health_remaining_account_pks.extend([serum3.open_orders for serum3 in mango_account.serum3 if serum3.market_index != 65535])
+                health_remaining_account_pks.extend([
+                    serum_position_index['open_orders']
+                    for serum_position_index in serum_position_indices
+                    if serum_position_index['market_index'] != 65535
+                ])
             case 'scanning':
                 raise NotImplementedError()
 
@@ -614,6 +640,8 @@ class MangoClient():
             AccountMeta(pubkey=remaining_account_pk, is_writable=False, is_signer=False)
             for remaining_account_pk in health_remaining_account_pks
         ]
+
+        print(remaining_accounts)
 
         return remaining_accounts
 
@@ -749,7 +777,30 @@ class MangoClient():
             'payer_oracle': bank.oracle
         }
 
-        remaining_accounts = self._health_remaining_accounts('fixed', [], [], mango_account)
+        open_orders_for_market = []
+
+        banks = []
+
+        try:
+            serum3 = [serum3 for serum3 in mango_account.serum3 if serum3.market_index == serum_market_index][0]
+        except IndexError:
+            open_orders_for_market.append([serum_market, open_orders])
+
+            if not TokenPositionHelper.is_active(mango_account.tokens[serum_market.quote_token_index]):
+                banks.append([bank for bank in self.banks if bank.token_index == serum_market.quote_token_index][0])
+
+            if not TokenPositionHelper.is_active(mango_account.tokens[serum_market.base_token_index]):
+                banks.append([bank for bank in self.banks if bank.token_index == serum_market.base_token_index][0])
+
+        self.connection.confirm_transaction()
+
+        remaining_accounts = self._health_remaining_accounts(
+            'fixed',
+            banks,
+            [],
+            mango_account,
+            open_orders_for_market
+        )
 
         serum3_place_order_ix = serum3_place_order(
             serum3_place_order_args,
@@ -787,7 +838,7 @@ class MangoClient():
             'oracle': perp_market.oracle
         }
 
-        remaining_accounts = self._health_remaining_accounts('fixed', [[bank for bank in self.banks if bank.token_index == 0][0]], [perp_market], mango_account)
+        remaining_accounts = self._health_remaining_accounts('fixed', [[bank for bank in self.banks if bank.token_index == 0][0]], [perp_market], mango_account, [])
 
         perp_place_order_ix = perp_place_order(
             perp_place_order_args,
@@ -1089,7 +1140,8 @@ class MangoClient():
             'fixed',
             [bank for bank in self.banks if bank.token_index == 0],
             [perp_market],
-            mango_account
+            mango_account,
+            []
         )
 
         return perp_place_order_pegged(
