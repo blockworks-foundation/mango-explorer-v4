@@ -460,14 +460,40 @@ class MangoClient():
     async def orders(self, mango_account: MangoAccount, symbol: str):
         market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
 
+        orderbook = await self.orderbook_l3(symbol)
+
+        orders = []
+
         match market_type:
             case 'spot':
-                raise NotImplementedError("Order retrieval for spot markets isn't implemented yet")
+                serum_market_config = [
+                    serum3_market_config
+                    for serum3_market_config in self.group_config['serum3Markets']
+                    if serum3_market_config['name'] == symbol
+                ][0]
+
+                serum3 = next(iter([
+                    serum3
+                    for serum3 in mango_account.serum3
+                    if serum3.market_index == serum_market_config['marketIndex']
+                ]), None)
+
+                if serum3 is None:
+                    return []
+
+                for side in ['bids', 'asks']:
+                    for order in orderbook[side]:
+                        if order['open_orders'] != serum3.open_orders:
+                            continue
+
+                        orders.append({
+                            'side': side,
+                            'price': order['price'],
+                            'size': order['size'],
+                            'client_order_id': order['client_order_id']
+                        })
+
             case 'perpetual':
-                orderbook = await self.orderbook_l3(symbol)
-
-                orders = []
-
                 for side in ['bids', 'asks']:
                     for order in orderbook[side]:
                         if order['mango_account'] != mango_account.public_key:
@@ -480,7 +506,7 @@ class MangoClient():
                             'client_order_id': order['client_order_id']
                         })
 
-                return orders
+        return orders
 
     async def fills(self, symbol: str):
         # TODO: Validate that the symbol entered is valid
@@ -746,8 +772,6 @@ class MangoClient():
             for remaining_account_pk in health_remaining_account_pks
         ]
 
-        print(remaining_accounts)
-
         return remaining_accounts
 
     def make_serum3_create_open_orders_ix(self, mango_account: MangoAccount, symbol: str):
@@ -896,8 +920,6 @@ class MangoClient():
 
             if not TokenPositionHelper.is_active(mango_account.tokens[serum_market.base_token_index]):
                 banks.append([bank for bank in self.banks if bank.token_index == serum_market.base_token_index][0])
-
-        self.connection.confirm_transaction()
 
         remaining_accounts = self._health_remaining_accounts(
             'fixed',

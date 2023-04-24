@@ -14,7 +14,7 @@ async def main():
 
     parser.add_argument(
         '--depth',
-        default=50,
+        default=3,
         type=int
     )
 
