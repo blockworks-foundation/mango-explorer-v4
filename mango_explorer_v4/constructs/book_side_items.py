@@ -18,20 +18,17 @@ from mango_explorer_v4.helpers.perp_market import PerpMarketHelper
 
 @dataclass
 class BookSideItem:
+    side: typing.Literal['bids', 'asks']
     seq_num: int
     order_id: int
     owner: PublicKey
-    open_orders_slot: int
-    fee_tier: 0
-    ui_price: float
     price: int
-    ui_size: float
+    price_ui: float
     size: int
-    side: typing.Literal['bids', 'asks']
-    timestamp: int
-    expiry_timestamp: int
-    perp_market_index: int
-    is_expired: bool
+    size_ui: float
+    client_order_id: int
+    created_at: int
+    expires_at: int
     is_oracle_pegged: bool
     oracle_pegged_properties: typing.Any
 
@@ -68,9 +65,7 @@ class BookSideItems:
                         leaf_node: LeafNode = LeafNode.layout.parse(bytes([2] + node.data))
 
                         if is_oracle_pegged: # TODO: This won't change - no need to evaluate more than once
-                            price_data = leaf_node.key >> 64
-
-                            price_offset = price_data - (1 << 63)
+                            price_offset = (leaf_node.key >> 64) - (1 << 63)
 
                             price_lots = PerpMarketHelper.ui_price_to_lots(self.perp_market, self.oracle_price) + price_offset
 
@@ -93,29 +88,23 @@ class BookSideItems:
 
                         expiry_timestamp = leaf_node.timestamp + leaf_node.time_in_force if leaf_node.time_in_force else sys.maxsize
 
-                        is_expired = now > expiry_timestamp
-
                         yield BookSideItem(
-                            {
+                            side=self.side,
+                            seq_num={
                                 'bids': RUST_U64_MAX - (leaf_node.key & ((1 << 64) - 1)),
                                 'asks': leaf_node.key & ((1 << 64) - 1)
                             }[self.side],
-                            leaf_node.key,
-                            leaf_node.owner,
-                            leaf_node.owner_slot,
-                            0,
-                            # float(Decimal(price_lots) * Decimal(self.perp_market.price_lots_to_ui_converter)),
-                            float(PerpMarketHelper.price_lots_to_ui(self.perp_market, price_lots)),
-                            price_lots,
-                            float(PerpMarketHelper.base_lots_to_ui(self.perp_market, leaf_node.quantity)),
-                            leaf_node.quantity,
-                            self.side,
-                            leaf_node.timestamp,
-                            expiry_timestamp,
-                            self.perp_market.perp_market_index,
-                            is_expired,
-                            is_oracle_pegged,
-                            oracle_pegged_properties
+                            order_id=leaf_node.key,
+                            owner=leaf_node.owner,
+                            price=price_lots,
+                            price_ui=float(PerpMarketHelper.price_lots_to_ui(self.perp_market, price_lots)),
+                            size=leaf_node.quantity,
+                            size_ui=float(PerpMarketHelper.base_lots_to_ui(self.perp_market, leaf_node.quantity)),
+                            client_order_id=leaf_node.client_order_id,
+                            created_at=leaf_node.timestamp,
+                            expires_at=expiry_timestamp,
+                            is_oracle_pegged=is_oracle_pegged,
+                            oracle_pegged_properties=oracle_pegged_properties
                         )
 
         fixed_items = entries(self.book_side.roots[0], False)
@@ -123,7 +112,7 @@ class BookSideItems:
         oracle_pegged_items = entries(self.book_side.roots[1], True)
 
         def is_better(side: typing.Literal['bids', 'asks'], a: BookSideItem, b: BookSideItem):
-            # TODO: This can be comparison operators instead
+            # TODO: This can be comparison operators instead, and can could UI prices instead of native
             if a.price == b.price:
                 return a.seq_num < b.seq_num
                 # ^ If prices are equal, prefer the oldest created
@@ -151,10 +140,21 @@ class BookSideItems:
     def l2(self):
         orders = []
 
-        for key, groups in itertools.groupby([[order.ui_price, order.ui_size] for order in self], lambda order: order[0]):
+        for key, groups in itertools.groupby([[order.price_ui, order.size_ui] for order in self], lambda order: order[0]):
             orders.append([key, float(sum([Decimal(str(size)) for price, size in groups]))])
 
         return orders
+
+    def l3(self):
+        return [
+            [
+                order.price_ui,
+                order.size_ui,
+                order.owner,
+                order.client_order_id
+            ]
+            for order in self
+        ]
 
     def impact_price(self, impact_quantity: float):
         accum = 0
