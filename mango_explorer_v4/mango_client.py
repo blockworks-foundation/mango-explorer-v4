@@ -383,7 +383,56 @@ class MangoClient():
 
         match market_type:
             case 'spot':
-                raise NotImplementedError("L3 orderbook retrieval for spot markets  isn't implemented yet")
+                serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
+
+                serum_market_index = serum_market_config['marketIndex']
+
+                serum_market = [
+                    serum_market
+                    for serum_market in self.serum_markets
+                    if serum_market.market_index == serum_market_index
+                ][0]
+
+                serum_market_external = [
+                    serum_market_external
+                    for serum_market_external in self.serum_markets_external
+                    if serum_market_external.state.public_key() == serum_market.serum_market_external
+                ][0]
+
+                response = await self.connection.get_multiple_accounts([
+                    serum_market_external.state.bids(),
+                    serum_market_external.state.asks()
+                ])
+
+                [raw_bids, raw_asks] = response.value
+
+                [bids, asks] = [
+                    OrderBook.from_bytes(serum_market_external.state, raw_bids.data),
+                    OrderBook.from_bytes(serum_market_external.state, raw_asks.data)
+                ]
+
+                orderbook = {
+                    'symbol': symbol,
+                    'bids': [
+                        {
+                            'price': bid.info.price,
+                            'size': bid.info.size,
+                            'open_orders': bid.open_order_address,
+                            'client_order_id': bid.client_id
+                        } for bid in bids.orders()
+                    ][:(depth if depth != 0 else sys.maxsize)],
+                    'asks': [
+                        {
+                            'price': ask.info.price,
+                            'size': ask.info.size,
+                            'open_orders': ask.open_order_address,
+                            'client_order_id': ask.client_id
+                        } for ask in asks.orders()
+                    ][:(depth if depth != 0 else sys.maxsize)],
+                    'slot': response.context.slot
+                }
+
+                return orderbook
             case 'perpetual':
                 perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
