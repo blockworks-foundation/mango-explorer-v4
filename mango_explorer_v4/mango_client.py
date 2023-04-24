@@ -487,6 +487,7 @@ class MangoClient():
                             continue
 
                         orders.append({
+                            'symbol': orderbook['symbol'],
                             'side': side,
                             'price': order['price'],
                             'size': order['size'],
@@ -500,6 +501,7 @@ class MangoClient():
                             continue
 
                         orders.append({
+                            'symbol': orderbook['symbol'],
                             'side': side,
                             'price': order['price'],
                             'size': order['size'],
