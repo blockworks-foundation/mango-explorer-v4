@@ -13,13 +13,18 @@ async def main():
         required=True
     )
 
+    parser.add_argument(
+        '--symbol',
+        required=True
+    )
+
     args = parser.parse_args()
 
     mango_client = await MangoClient.connect()
 
     mango_account = await mango_client.get_mango_account(args.mango_account)
 
-    print(await mango_client.orders(mango_account))
+    print(await mango_client.orders(mango_account, args.symbol))
 
 
 if __name__ == '__main__':

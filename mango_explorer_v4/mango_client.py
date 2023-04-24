@@ -257,36 +257,6 @@ class MangoClient():
 
                 return orderbook
 
-    async def orderbook_l3(self, symbol: str, depth: int = 50):
-        market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
-
-        match market_type:
-            case 'spot':
-                raise NotImplementedError("L3 orderbook retrieval for spot markets  isn't implemented yet")
-            case 'perpetual':
-                perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
-
-                perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
-
-                accounts = await self.connection.get_multiple_accounts([perp_market.bids, perp_market.asks, perp_market.oracle])
-
-                [raw_bids, raw_asks, raw_oracle] = accounts.value
-
-                [bids, asks] = [BookSide.decode(raw_bids.data), BookSide.decode(raw_asks.data)]
-
-                oracle = pyth.PRICE.parse(raw_oracle.data)
-
-                oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
-
-                orderbook = {
-                    'symbol': symbol,
-                    'bids': BookSideItems('bids', bids, perp_market, oracle_price).l3()[:depth],
-                    'asks': BookSideItems('asks', asks, perp_market, oracle_price).l3()[:depth],
-                    'slot': accounts.context.slot
-                }
-
-                return orderbook
-
     async def incremental_orderbook_l2(self, symbol: str, depth: int = 50):
         # TODO: Validate the symbol exists
         market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
@@ -407,6 +377,61 @@ class MangoClient():
                             continue
 
                         yield orderbook
+
+    async def orderbook_l3(self, symbol: str, depth: int = 0):
+        market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
+
+        match market_type:
+            case 'spot':
+                raise NotImplementedError("L3 orderbook retrieval for spot markets  isn't implemented yet")
+            case 'perpetual':
+                perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
+
+                perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
+
+                accounts = await self.connection.get_multiple_accounts([perp_market.bids, perp_market.asks, perp_market.oracle])
+
+                [raw_bids, raw_asks, raw_oracle] = accounts.value
+
+                [bids, asks] = [BookSide.decode(raw_bids.data), BookSide.decode(raw_asks.data)]
+
+                oracle = pyth.PRICE.parse(raw_oracle.data)
+
+                oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
+
+                orderbook = {
+                    'symbol': symbol,
+                    'bids': BookSideItems('bids', bids, perp_market, oracle_price).l3()[:(depth if depth != 0 else sys.maxsize)],
+                    'asks': BookSideItems('asks', asks, perp_market, oracle_price).l3()[:(depth if depth != 0 else sys.maxsize)],
+                    'slot': accounts.context.slot
+                }
+
+                return orderbook
+
+    async def orders(self, mango_account: MangoAccount, symbol: str):
+        market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
+
+        match market_type:
+            case 'spot':
+                raise NotImplementedError("Order retrieval for spot markets isn't implemented yet")
+            case 'perpetual':
+                orderbook = await self.orderbook_l3(symbol)
+
+                orders = []
+
+                for side in ['bids', 'asks']:
+                    for order in orderbook[side]:
+                        if order['mango_account'] != mango_account.public_key:
+                            continue
+
+                        orders.append({
+                            'side': side,
+                            'price': order['price'],
+                            'size': order['size'],
+                            'client_order_id': order['client_order_id']
+                        })
+
+                return orders
 
     async def fills(self, symbol: str):
         # TODO: Validate that the symbol entered is valid
@@ -1589,6 +1614,3 @@ class MangoClient():
             )
 
         return dict(entries)
-
-    async def orders(self, mango_account: MangoAccount):
-        pass

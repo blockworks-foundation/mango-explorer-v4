@@ -147,12 +147,12 @@ class BookSideItems:
 
     def l3(self):
         return [
-            [
-                order.price_ui,
-                order.size_ui,
-                order.owner,
-                order.client_order_id
-            ]
+            {
+                'price': order.price_ui,
+                'size': order.size_ui,
+                'mango_account': order.owner,
+                'client_order_id': order.client_order_id
+            }
             for order in self
         ]
 
