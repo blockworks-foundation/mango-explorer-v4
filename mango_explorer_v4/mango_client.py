@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import json
 import logging
 import pathlib
@@ -40,6 +41,8 @@ from mango_explorer_v4.helpers.mango_account import MangoAccountHelper
 from mango_explorer_v4.helpers.token_info import TokenInfoHelper
 from mango_explorer_v4.helpers.serum3_info import Serum3InfoHelper
 from mango_explorer_v4.helpers.perp_info import PerpInfoHelper
+from mango_explorer_v4.helpers.perp_open_order import PerpOpenOrderHelper
+from mango_explorer_v4.helpers.serum3_orders import Serum3Orders
 from mango_explorer_v4.instructions.perp_cancel_all_orders import PerpCancelAllOrdersArgs, PerpCancelAllOrdersAccounts, perp_cancel_all_orders
 from mango_explorer_v4.instructions.perp_place_order import PerpPlaceOrderArgs, PerpPlaceOrderAccounts, perp_place_order
 from mango_explorer_v4.instructions.perp_place_order_pegged import PerpPlaceOrderPeggedArgs, PerpPlaceOrderPeggedAccounts, perp_place_order_pegged
@@ -60,6 +63,7 @@ from mango_explorer_v4.types.health_type import Init, Maint, LiquidationEnd
 from mango_explorer_v4.types.serum3_info import Serum3Info
 from mango_explorer_v4.types.health_cache import HealthCache
 from mango_explorer_v4.types.health_type import HealthTypeKind
+from mango_explorer_v4.types.perp_open_order import PerpOpenOrder
 from .constants import RUST_I64_MAX, SERUM_PROGRAM_ID
 from .constructs.book_side_items import BookSideItems
 from .constructs.serum3_reserved import Serum3Reserved
@@ -457,56 +461,127 @@ class MangoClient():
 
                 return orderbook
 
-    async def orders(self, mango_account: MangoAccount, symbol: str):
-        market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
+    async def orders(self, mango_account: MangoAccount):
+        serum_market_configs = [
+            (
+                [
+                    serum_market_config for serum_market_config in self.serum_market_configs
+                    if serum_market_config['marketIndex'] == serum3.market_index
+                ][0],
+                serum3
+            )
+            for serum3 in filter(Serum3OrdersHelper.is_active, mango_account.serum3)
+        ]
 
-        orderbook = await self.orderbook_l3(symbol)
+        serum_markets_external_with_meta = [
+            (
+                [
+                    serum_market_external for serum_market_external in self.serum_markets_external
+                    if serum_market_external.state.public_key() == PublicKey(serum_market_config['serumMarketExternal'])
+                ][0],
+                serum_market_config,
+                serum3
+            )
+            for serum_market_config, serum3 in serum_market_configs
+        ]
+
+        perp_markets_with_meta = [
+            (
+                [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_index][0],
+                [perp_market_config for perp_market_config in self.perp_market_configs if perp_market_config['marketIndex'] == perp_market_index][0]
+            )
+            for perp_market_index in {
+                perp_open_order.market
+                for perp_open_order
+                in filter(PerpOpenOrderHelper.is_active, mango_account.perp_open_orders)
+            }
+        ]
+
+        accounts = await self.connection.get_multiple_accounts([
+            *itertools.chain(*[
+                (serum_market_external.state.bids(), serum_market_external.state.asks())
+                for serum_market_external, _, _
+                in serum_markets_external_with_meta
+            ]),
+            *itertools.chain(*[
+                (perp_market.bids, perp_market.asks, perp_market.oracle)
+                for perp_market, _
+                in perp_markets_with_meta
+            ])
+        ])
 
         orders = []
 
-        match market_type:
-            case 'spot':
-                serum_market_config = [
-                    serum3_market_config
-                    for serum3_market_config in self.group_config['serum3Markets']
-                    if serum3_market_config['name'] == symbol
-                ][0]
+        separator = len(serum_markets_external_with_meta) * 2
 
-                serum3 = next(iter([
-                    serum3
-                    for serum3 in mango_account.serum3
-                    if serum3.market_index == serum_market_config['marketIndex']
-                ]), None)
+        def chunks(chunkable, size): return [chunkable[n:n + size] for n in range(0, len(chunkable), size)]
 
-                if serum3 is None:
-                    return []
+        for [serum_market_external, serum_market_config, serum3], [raw_bids, raw_asks] in zip(
+            serum_markets_external_with_meta, chunks(accounts.value[:separator], 2)
+        ):
+            [bids, asks] = [
+                OrderBook.from_bytes(serum_market_external.state, raw_bids.data),
+                OrderBook.from_bytes(serum_market_external.state, raw_asks.data)
+            ]
 
-                for side in ['bids', 'asks']:
-                    for order in orderbook[side]:
-                        if order['open_orders'] != serum3.open_orders:
-                            continue
+            orderbook = {
+                'symbol': serum_market_config['name'],
+                'bids': [
+                    {
+                        'price': bid.info.price,
+                        'size': bid.info.size,
+                        'open_orders': bid.open_order_address,
+                        'client_order_id': bid.client_id
+                    } for bid in bids.orders()
+                ],
+                'asks': [
+                    {
+                        'price': ask.info.price,
+                        'size': ask.info.size,
+                        'open_orders': ask.open_order_address,
+                        'client_order_id': ask.client_id
+                    } for ask in asks.orders()
+                ],
+                'slot': accounts.context.slot
+            }
 
-                        orders.append({
-                            'symbol': orderbook['symbol'],
-                            'side': side,
-                            'price': order['price'],
-                            'size': order['size'],
-                            'client_order_id': order['client_order_id']
-                        })
+            for side in ['bids', 'asks']:
+                for order in orderbook[side]:
+                    if order['open_orders'] != serum3.open_orders:
+                        continue
 
-            case 'perpetual':
-                for side in ['bids', 'asks']:
-                    for order in orderbook[side]:
-                        if order['mango_account'] != mango_account.public_key:
-                            continue
+                    orders.append({
+                        'symbol': orderbook['symbol'],
+                        'side': side,
+                        'price': order['price'],
+                        'size': order['size'],
+                        'client_order_id': order['client_order_id']
+                    })
 
-                        orders.append({
-                            'symbol': orderbook['symbol'],
-                            'side': side,
-                            'price': order['price'],
-                            'size': order['size'],
-                            'client_order_id': order['client_order_id']
-                        })
+        for [perp_market, perp_market_config], [raw_bids, raw_asks, raw_oracle] in zip(perp_markets_with_meta, chunks(accounts.value[separator:], 3)):
+            [bids, asks, oracle] = [BookSide.decode(raw_bids.data), BookSide.decode(raw_asks.data), pyth.PRICE.parse(raw_oracle.data)]
+
+            oracle_price = oracle.agg.price * (Decimal(10) ** oracle.expo)
+
+            orderbook = {
+                'symbol': perp_market_config['name'],
+                'bids': BookSideItems('bids', bids, perp_market, oracle_price).l3(),
+                'asks': BookSideItems('asks', asks, perp_market, oracle_price).l3(),
+                'slot': accounts.context.slot
+            }
+
+            for side in ['bids', 'asks']:
+                for order in orderbook[side]:
+                    if order['mango_account'] != mango_account.public_key:
+                        continue
+
+                    orders.append({
+                        'symbol': orderbook['symbol'],
+                        'side': side,
+                        'price': order['price'],
+                        'size': order['size'],
+                        'client_order_id': order['client_order_id']
+                    })
 
         return orders
 
