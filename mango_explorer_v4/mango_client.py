@@ -909,7 +909,7 @@ class MangoClient():
 
         return serum3_create_open_orders_ix
 
-    def make_serum3_place_order_ix(self, mango_account: MangoAccount, symbol: str, side: Literal['bids', 'asks'], price: float, size: float):
+    def make_serum3_place_order_ix(self, mango_account: MangoAccount, keypair: Keypair, symbol: str, side: Literal['bids', 'asks'], price: float, size: float):
         serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
 
         serum_market_index = serum_market_config['marketIndex']
@@ -988,7 +988,7 @@ class MangoClient():
         serum3_place_order_accounts: Serum3PlaceOrderAccounts = {
             'group': mango_account.group,
             'account': mango_account.public_key,
-            'owner': mango_account.owner,
+            'owner': keypair.public_key,
             'open_orders': open_orders,
             'serum_market': PublicKey(serum_market_config['publicKey']),
             'serum_program': SERUM_PROGRAM_ID,
@@ -1036,7 +1036,7 @@ class MangoClient():
 
         return serum3_place_order_ix
 
-    def make_perp_place_order_ix(self, mango_account: MangoAccount, symbol, side, price, size):
+    def make_perp_place_order_ix(self, mango_account: MangoAccount, keypair: Keypair, symbol, side, price, size):
         perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
         perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
@@ -1056,7 +1056,7 @@ class MangoClient():
         perp_place_order_accounts: PerpPlaceOrderAccounts = {
             'group': perp_market.group,
             'account': mango_account.public_key,
-            'owner': mango_account.owner,
+            'owner': keypair.public_key,
             'perp_market': PublicKey(perp_market_config['publicKey']),
             'bids': perp_market.bids,
             'asks': perp_market.asks,
@@ -1076,12 +1076,12 @@ class MangoClient():
 
     async def place_order(
         self,
+        mango_account: MangoAccount,
+        keypair: Keypair,
         symbol: str,
         side: Literal['bids', 'asks'],
         price: float,
-        size: float,
-        mango_account: MangoAccount,
-        keypair: Keypair
+        size: float
     ):
         market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
 
@@ -1100,6 +1100,7 @@ class MangoClient():
 
                 serum3_place_order_ix = self.make_serum3_place_order_ix(
                     mango_account,
+                    keypair,
                     symbol,
                     side,
                     price,
@@ -1118,7 +1119,7 @@ class MangoClient():
 
                 recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
 
-                perp_place_order_ix = self.make_perp_place_order_ix(mango_account, symbol, side, price, size)
+                perp_place_order_ix = self.make_perp_place_order_ix(mango_account, keypair, symbol, side, price, size)
 
                 tx.add(perp_place_order_ix)
 
@@ -1319,6 +1320,7 @@ class MangoClient():
     def make_place_perp_pegged_order_ix(
         self,
         mango_account: MangoAccount,
+        keypair: Keypair,
         symbol: str,
         side: Literal['bids', 'asks'],
         price_offset: float,
@@ -1351,7 +1353,7 @@ class MangoClient():
         perp_place_order_pegged_accounts: PerpPlaceOrderPeggedAccounts = {
             'group': PublicKey(self.group_config['publicKey']),
             'account': mango_account.public_key,
-            'owner': mango_account.owner,
+            'owner': keypair.public_key,
             'perp_market': PublicKey(perp_market_config['publicKey']),
             'bids': perp_market.bids,
             'asks': perp_market.asks,
@@ -1395,6 +1397,7 @@ class MangoClient():
         tx.add(
             self.make_place_perp_pegged_order_ix(
                 mango_account,
+                keypair,
                 symbol,
                 side,
                 price_offset,

@@ -51,7 +51,7 @@ async def main():
 
     mango_account = await mango_client.get_mango_account(args.mango_account)
 
-    print(await mango_client.place_order(args.symbol, args.side, args.price, args.size, mango_account, keypair))
+    print(await mango_client.place_order(mango_account, keypair, args.symbol, args.side, args.price, args.size))
 
     # e.g 3VQA4zqmRPLtmeHBNV2dKZKhXYX3cHBiM1LpCrjgJZwZDF418GF6RQ9DihSZq6Zg4pjqcUjTMQwEDNLuybfL8mQT
     # (Check the UI)
