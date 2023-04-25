@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import time
 
 from base58 import b58decode
 from solana.keypair import Keypair
@@ -35,12 +36,29 @@ async def main():
 
     parser.add_argument(
         '--price',
-        type=float
+        type=float,
+        required=True
     )
 
     parser.add_argument(
         '--size',
-        type=float
+        type=float,
+        required=True
+    )
+
+    parser.add_argument(
+        '--mode',
+        type=str,
+        required=False,
+        default='Limit',
+        choices=['Limit', 'ImmediateOrCancel', 'PostOnly']
+    )
+
+    parser.add_argument(
+        '--client-order-id',
+        type=int,
+        required=False,
+        default=int(time.time_ns() / 1e6)
     )
 
     args = parser.parse_args()
@@ -51,7 +69,7 @@ async def main():
 
     mango_account = await mango_client.get_mango_account(args.mango_account)
 
-    print(await mango_client.place_order(mango_account, keypair, args.symbol, args.side, args.price, args.size))
+    print(await mango_client.place_order(mango_account, keypair, args.symbol, args.side, args.price, args.size, args.mode, args.client_order_id))
 
     # e.g 3VQA4zqmRPLtmeHBNV2dKZKhXYX3cHBiM1LpCrjgJZwZDF418GF6RQ9DihSZq6Zg4pjqcUjTMQwEDNLuybfL8mQT
     # (Check the UI)

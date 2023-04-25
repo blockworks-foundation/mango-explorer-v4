@@ -909,7 +909,17 @@ class MangoClient():
 
         return serum3_create_open_orders_ix
 
-    def make_serum3_place_order_ix(self, mango_account: MangoAccount, keypair: Keypair, symbol: str, side: Literal['bids', 'asks'], price: float, size: float):
+    def make_serum3_place_order_ix(
+        self,
+        mango_account: MangoAccount,
+        keypair: Keypair,
+        symbol: str,
+        side: Literal['bids', 'asks'],
+        price: float,
+        size: float,
+        mode: Literal['Limit', 'ImmediateOrCancel', 'PostOnly'] = 'Limit',
+        client_order_id: int = int(time.time_ns() / 1e6)
+    ):
         serum_market_config = [serum3_market_config for serum3_market_config in self.group_config['serum3Markets'] if serum3_market_config['name'] == symbol][0]
 
         serum_market_index = serum_market_config['marketIndex']
@@ -930,17 +940,15 @@ class MangoClient():
 
         max_base_qty = serum_market_external.state.base_size_number_to_lots(size)
 
-        order_type = {'limit': serum3_order_type.Limit(), 'immediate_or_cancel': serum3_order_type.ImmediateOrCancel()}['limit']
+        mode = serum3_order_type.from_decoded({mode: {}})
 
         max_native_quote_qty_without_fees = limit_price * max_base_qty
 
-        is_maker = order_type == serum3_order_type.PostOnly()
+        is_maker = mode == serum3_order_type.PostOnly()
 
-        fees = {True: - (0.5 / 1e4), False: (1 / 1e4)}[is_maker]
+        fees = - (0.5 / 1e4) if is_maker else (1 / 1e4)
 
         max_native_quote_qty_including_fees = max_native_quote_qty_without_fees + round(max_native_quote_qty_without_fees * fees)
-
-        client_order_id = round(time.time_ns() / 1e6)
 
         serum3_place_order_args: Serum3PlaceOrderArgs = {
             'side': {'bids': serum3_side.Bid(), 'asks': serum3_side.Ask()}[side],
@@ -948,7 +956,7 @@ class MangoClient():
             'max_base_qty': max_base_qty,
             'max_native_quote_qty_including_fees': max_native_quote_qty_including_fees,
             'self_trade_behavior': serum3_self_trade_behavior.DecrementTake(),
-            'order_type': order_type,
+            'order_type': mode,
             'client_order_id': client_order_id,
             'limit': 10
         }
@@ -1036,18 +1044,30 @@ class MangoClient():
 
         return serum3_place_order_ix
 
-    def make_perp_place_order_ix(self, mango_account: MangoAccount, keypair: Keypair, symbol, side, price, size):
+    def make_perp_place_order_ix(
+        self,
+        mango_account: MangoAccount,
+        keypair: Keypair,
+        symbol,
+        side,
+        price: float,
+        size: float,
+        mode: Literal['Limit', 'ImmediateOrCancel', 'PostOnly', 'Market', 'PostOnlySlide'] = 'Limit',
+        client_order_id: int = int(time.time() * 1e3)
+    ):
         perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
         perp_market = [perp_market for perp_market in self.perp_markets if perp_market.perp_market_index == perp_market_config['marketIndex']][0]
+
+        mode = place_order_type.from_decoded({mode: {}})
 
         perp_place_order_args: PerpPlaceOrderArgs = {
             'side': {'bids': Bid, 'asks': Ask}[side],
             'price_lots': PerpMarketHelper.ui_price_to_lots(perp_market, price),
             'max_base_lots': PerpMarketHelper.ui_base_to_lots(perp_market, size),
             'max_quote_lots': sys.maxsize,
-            'client_order_id': int(time.time() * 1e3),
-            'order_type': place_order_type.Limit(),
+            'client_order_id': client_order_id,
+            'order_type': mode,
             'reduce_only': False,
             'expiry_timestamp': 0,
             'limit': 10
@@ -1081,7 +1101,9 @@ class MangoClient():
         symbol: str,
         side: Literal['bids', 'asks'],
         price: float,
-        size: float
+        size: float,
+        mode: Literal['Limit', 'ImmediateOrCancel', 'PostOnly'] = 'Limit',
+        client_order_id: int = int(time.time_ns() / 1e6)
     ):
         market_type = {'PERP': 'perpetual', 'USDC': 'spot'}[re.split(r"[-|/]", symbol)[1]]
 
@@ -1104,7 +1126,9 @@ class MangoClient():
                     symbol,
                     side,
                     price,
-                    size
+                    size,
+                    mode,
+                    client_order_id
                 )
 
                 recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
@@ -1119,7 +1143,7 @@ class MangoClient():
 
                 recent_blockhash = str((await self.connection.get_latest_blockhash()).value.blockhash)
 
-                perp_place_order_ix = self.make_perp_place_order_ix(mango_account, keypair, symbol, side, price, size)
+                perp_place_order_ix = self.make_perp_place_order_ix(mango_account, keypair, symbol, side, price, size, mode, client_order_id)
 
                 tx.add(perp_place_order_ix)
 
