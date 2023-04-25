@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mango-explorer-v4"
-version = "0.7.8"
+version = "0.7.9"
 description = ""
 authors = ["waterquarks <waterquarks@gmail.com>"]
 readme = "README.md"
