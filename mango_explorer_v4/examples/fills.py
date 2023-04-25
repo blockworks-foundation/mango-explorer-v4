@@ -23,10 +23,8 @@ async def main():
 
     mango_client = await MangoClient.connect()
 
-    response = await mango_client.fills(args.symbol)
+    print(await mango_client.fills(args.symbol))
 
-    for fill in response['fills']:
-        print(fill)
 
 
 if __name__ == '__main__':

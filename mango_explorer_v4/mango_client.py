@@ -592,7 +592,29 @@ class MangoClient():
 
         match market_type:
             case 'spot':
-                raise NotImplementedError("Spot markets fills retrieval isn't implemented yet")
+                serum_market_config = [
+                    serum3_market_config for serum3_market_config in self.group_config['serum3Markets']
+                    if serum3_market_config['name'] == symbol
+                ][0]
+
+                serum_market_index = serum_market_config['marketIndex']
+
+                serum_market: Serum3Market = [
+                    serum_market
+                    for serum_market in self.serum_markets
+                    if serum_market.market_index == serum_market_index
+                ][0]
+
+                serum_market_external: AsyncMarket = [
+                    serum_market_external
+                    for serum_market_external in self.serum_markets_external
+                    if serum_market_external.state.public_key() == serum_market.serum_market_external
+                ][0]
+
+                return {
+                    'symbol': symbol,
+                    'fills': [fill._asdict() for fill in await serum_market_external.load_fills(9999)]
+                }
             case 'perpetual':
                 perp_market_config = [perp_market_config for perp_market_config in self.group_config['perpMarkets'] if perp_market_config['name'] == symbol][0]
 
@@ -1115,10 +1137,7 @@ class MangoClient():
             if serum_market.market_index == serum_market_index
         ][0]
 
-        try:
-            serum3 = [serum3 for serum3 in mango_account.serum3 if serum3.market_index == serum_market_index][0]
-        except IndexError as error:
-            print(error)
+        serum3 = [serum3 for serum3 in mango_account.serum3 if serum3.market_index == serum_market_index][0]
 
         serum_market_external = [
             serum_market_external

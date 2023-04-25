@@ -2,6 +2,7 @@ import asyncio
 
 from mango_explorer_v4.mango_client import MangoClient
 
+
 async def main():
     mango_client = await MangoClient.connect()
 
