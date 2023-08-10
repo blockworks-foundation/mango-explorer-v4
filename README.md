@@ -48,7 +48,7 @@ async def main():
     keypair = Keypair.from_secret_key(b58decode('SECRET_KEY'))
     
     # Place a limit order
-    print(await mango_client.place_order(mango_account, keypair, 'SOL/USDC', 'bid', 10, 0.1, 'limit'))
+    print(await mango_client.place_order(mango_account, keypair, 'SOL/USDC', 'bids', 10, 0.1, 'Limit'))
     
     # Place an oracle pegged perp order: https://docs.mango.markets/mango-markets/oracle-peg-orders
     print(
