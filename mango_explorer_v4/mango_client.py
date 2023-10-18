@@ -87,7 +87,7 @@ class MangoClient():
     mint_infos: [MintInfo]
 
     @staticmethod
-    async def connect(rpc_url: str = 'https://mango.rpcpool.com/0f9acc0d45173b51bf7d7e09c1e5'):
+    async def connect(rpc_url: str = 'https://mango.rpcpool.com/946ef7337da3f5b8d3e4a34e7f88'):
         connection = AsyncClient(rpc_url, Processed)
 
         ids = json.loads(open(pathlib.Path(__file__).parent / 'ids.json').read())
