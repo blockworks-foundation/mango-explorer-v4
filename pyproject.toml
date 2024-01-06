@@ -93,6 +93,7 @@ zstandard = "0.17.0"
 sortedcontainers = "^2.4.0"
 aiostream = "^0.4.5"
 pyopenbook = "^0.7.3a0"
+aiohttp = "^3.9.1"
 
 
 [build-system]
