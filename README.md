@@ -2,6 +2,11 @@
 
 Python client library for interacting with Mango Markets V4.
 
+## This project is unmaintained
+
+This project is unmaintained. It is not feature complete and probably will not work.
+If you're interested in becoming a maintainer please [reach out in Discord](https://discord.gg/pcSkP3yJMU)
+
 ## Installation
 
 ![PyPI](https://img.shields.io/pypi/v/mango-explorer-v4)
