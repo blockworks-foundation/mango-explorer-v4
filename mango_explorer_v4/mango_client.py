@@ -3,6 +3,7 @@ import itertools
 import json
 import logging
 import pathlib
+import aiohttp
 import re
 import sys
 import time
@@ -64,7 +65,7 @@ from mango_explorer_v4.types.serum3_info import Serum3Info
 from mango_explorer_v4.types.health_cache import HealthCache
 from mango_explorer_v4.types.health_type import HealthTypeKind
 from mango_explorer_v4.types.perp_open_order import PerpOpenOrder
-from .constants import RUST_I64_MAX, SERUM_PROGRAM_ID
+from .constants import RUST_I64_MAX, SERUM_PROGRAM_ID, METADATA_API_URL
 from .constructs.book_side_items import BookSideItems
 from .constructs.serum3_reserved import Serum3Reserved
 from .oracles import pyth
@@ -87,11 +88,19 @@ class MangoClient():
     mint_infos: [MintInfo]
 
     @staticmethod
+    async def fetch_group_metadata(url: str):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    raise Exception(f"Failed to fetch group metadata: HTTP {response.status}")
+
+    @staticmethod
     async def connect(rpc_url: str = 'https://mango.rpcpool.com/0f9acc0d45173b51bf7d7e09c1e5'):
         connection = AsyncClient(rpc_url, Processed)
 
-        ids = json.loads(open(pathlib.Path(__file__).parent / 'ids.json').read())
-        # TODO: ^ Make it fetch from https://api.mngo.cloud/data/v4/group-metadata instead
+        ids = await MangoClient.fetch_group_metadata(METADATA_API_URL)
 
         group_config = [group_config for group_config in ids['groups'] if group_config['publicKey'] == '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'][0]
         # TODO: ^ Un-hardcode the group config public key (not necessary for now as there's only mainnet)
